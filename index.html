@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NanoRandom — Client-side BIP39 Seed Phrase Generator from Live Nano Blockhashes</title>
-    <meta name="description" content="NanoRandom generates BIP39 seed phrases (12/15/18/24 words) and strong passwords by combining a secure-random user salt with real-time blockhashes from the Nano (XNO) network. 100% client-side, no tracking.">
+      <meta name="description" content="NanoRandom generates BIP39 seed phrases (12/15/18/24 words) and strong passwords by combining an auto system salt + optional user salt + real-time blockhashes from the Nano (XNO) network. 100% client-side, no tracking.">
     <meta name="keywords" content="nano,random,seed phrase,mnemonic,bip39,xno,blockhash,entropy,crypto,nanexplorer,client-side,wallet generator">
     <meta name="author" content="nanorandom.dev">
     <meta name="robots" content="index, follow, max-image-preview:large">
@@ -37,7 +37,7 @@
       "@type": "WebApplication",
       "name": "NanoRandom",
       "url": "https://nanorandom.dev/",
-      "description": "Client-side BIP39 mnemonic seed phrase generator mixing a secure user salt with live Nano (XNO) blockhashes.",
+      "description": "Client-side BIP39 mnemonic seed phrase generator mixing auto system salt + user salt + live Nano (XNO) blockhashes.",
       "applicationCategory": "UtilitiesApplication",
       "operatingSystem": "Web",
       "browserRequirements": "Requires a modern browser with Web Crypto API support.",
@@ -145,7 +145,7 @@
                                         'border-warning': saltStatus.level === 'ok',
                                         'border-success': saltStatus.level === 'strong'
                                     }"
-                                    placeholder="Enter any text to mix with blockhash + system salt..."
+                                    placeholder="Enter your own text (leave empty if you just want the system salt)..."
                                     @input="scheduleGenerate()">
                                 <div class="salt-indicator mt-2">
                                     <div class="salt-bar">
@@ -403,7 +403,7 @@ mnemonic = [ WORDLIST[bits[i:i+11]]  for i in 0,11,22,... ]</pre>
                         </div>
                         <div class="alert alert-dark why-tip">
                             <i class="bi bi-shield-shaded"></i>
-                            But remember: <b>public blockhashes alone are not secret</b>. Your unique <b>user salt</b> (128-bit, client-side) is what makes each generated seed yours and unpredictable to anyone else on the internet.
+                            But remember: <b>public blockhashes alone are not secret</b>. The <b>system salt</b> (128-bit, auto-generated client-side) keeps each seed private; the <b>user salt</b> you type adds a second, personal layer.
                         </div>
                     </div>
                 </div>
@@ -432,7 +432,7 @@ mnemonic = [ WORDLIST[bits[i:i+11]]  for i in 0,11,22,... ]</pre>
                                 <div class="why-item">
                                     <i class="bi bi-intersect"></i>
                                     <b>NanoRandom mixes 2+ independent sources</b>
-                                    <span>Your seed is a hash of <em>your user salt</em> (browser CSPRNG) <em>plus</em> <em>live Nano blockhashes</em> (outside-world, verifiable entropy). Even if one source were flawed or influenced, the final entropy would still depend on the other.</span>
+                                    <span>Your seed is a hash of <em>auto system salt</em> (browser CSPRNG) + <em>optional user salt</em> (your text) + <em>live Nano blockhashes</em> (verifiable, outside world). Even if any one source is compromised, the final entropy still depends on the remaining ones.</span>
                                 </div>
                             </div>
                             <div class="col-md-6">
@@ -453,7 +453,7 @@ mnemonic = [ WORDLIST[bits[i:i+11]]  for i in 0,11,22,... ]</pre>
                         <div class="alert alert-dark why-tip">
                             <i class="bi bi-shield-shaded"></i>
                             The lesson of the Coldcard incident is: <b>never trust one RNG alone</b>.
-                            NanoRandom strips the "black box" of hardware: entropy comes from open, verifiable Live Nano blockhashes + your own secure-random salt, mixed with open public math.
+                            NanoRandom strips the "black box" of hardware: entropy comes from open, verifiable Live Nano blockhashes + auto-generated system salt + optional user salt, mixed with open public math.
                         </div>
                         <div class="why-references">
                             <span class="text-muted small">Read more:</span>
@@ -476,16 +476,17 @@ mnemonic = [ WORDLIST[bits[i:i+11]]  for i in 0,11,22,... ]</pre>
                         </details>
                         <details>
                             <summary>2. Where does the randomness come from?</summary>
-                            <p>Two sources are combined and SHA-256 hashed:</p>
+                            <p>Three sources are combined and SHA-256 hashed:</p>
                             <ul>
-                                <li><b>User salt</b> &ndash; a secure random 128-bit value generated by your browser's <code>crypto.getRandomValues()</code> on page load. You can edit it or click <i class="bi bi-arrow-repeat"></i> to regenerate.</li>
+                                <li><b>System salt</b> &ndash; a secure random 128-bit value generated by your browser's <code>crypto.getRandomValues()</code> on page load. Auto-generated, readonly, and you can click <i class="bi bi-arrow-repeat"></i> any time.</li>
+                                <li><b>User salt</b> &ndash; optional text you type yourself. Leave empty unless you want a second, personal layer.</li>
                                 <li><b>Live Nano blockhashes</b> &ndash; fetched from <code>api.nanexplorer.com/last-blocks</code> every 3 seconds. The last 16 hashes are concatenated.</li>
                             </ul>
-                            <p>Result: <code>entropy = SHA-256( salt + blockhashes )[0 : ENT/8]</code></p>
+                            <p>Result: <code>entropy = SHA-256( systemSalt + userSalt + blockhashes )[0 : ENT/8]</code></p>
                         </details>
                         <details>
-                            <summary>3. Why mix blockhash with a user salt?</summary>
-                            <p>Blockhashes are public, so anyone can see them. A blockhash alone is <i>not</i> a private secret. The secure-random user salt (kept only in your browser) is the secret part that makes the entropy unpredictable to the outside world, while the live blockhash guarantees freshness and uniqueness on the Nano network.</p>
+                            <summary>3. Why mix blockhash with two salts?</summary>
+                            <p>Blockhashes are public. A blockhash alone is <i>not</i> a private secret. The system salt is auto-generated by your browser (so nobody can calculate it in advance), and the user salt adds a second layer that you control &mdash; if an attacker knew the blockhash(es) and guessed one of the salts, they still have to guess the other. On the Nano network, both salts stay local, never uploaded.</p>
                         </details>
                         <details>
                             <summary>4. Is this tool safe? Where is my seed stored?</summary>
@@ -518,7 +519,7 @@ mnemonic = [ WORDLIST[bits[i:i+11]]  for i in 0,11,22,... ]</pre>
                     <div class="card-body">
                         <ul class="mb-0 security-list">
                             <li>Write down your seed phrase on paper and store it offline. Never store it in cloud notes or screenshots.</li>
-                            <li>Never share the seed or the user salt with anyone. Anyone with both can fully recover your wallet.</li>
+                            <li>Never share the seed or the salts (system + user) with anyone. Anyone with both salts + the matching blockhash window can fully recover your wallet.</li>
                             <li>For significant funds, prefer using an offline/air-gapped device and verify the seed derivation there before trusting any on-screen values.</li>
                             <li>This tool is open and client-side &mdash; you can save the page and run it offline after the first load.</li>
                         </ul>
@@ -573,7 +574,7 @@ mnemonic = [ WORDLIST[bits[i:i+11]]  for i in 0,11,22,... ]</pre>
                                 blockhash feed.
                             </p>
                             <p>
-                                Never share your seed or user salt with anyone.
+                                Never share your seed or the salts with anyone.
                             </p>
                             <p class="mt-2 text-muted">
                                 Generated seed phrases are for <b>testing and learning</b>.

@@ -74,10 +74,10 @@ function seedApp() {
         updateSaltStatus() {
             const s = this.userSalt || '';
             let level, msg, cls;
-            if (!s.length)            { level='empty';  msg='No custom salt entered. Seed uses only system salt + blockhash — predictable to anyone else knowing both. Enter some text below to lock it.'; cls='bg-danger'; }
-            else if (s.length < 6)    { level='weak';   msg=`Custom salt too short (${s.length} chars). Very easy to guess. Use at least 6 chars.`; cls='bg-danger'; }
-            else if (s.length < 16)   { level='ok';     msg=`Custom salt OK (${s.length} chars). Longer/ harder-to-guess is better.`; cls='bg-warning'; }
-            else                      { level='strong'; msg=`Custom salt strength: strong (${s.length} chars).`; cls='bg-success'; }
+            if (!s.length)            { level='empty';  msg='Empty. System salt is auto-generated — enter your own text to add a personal layer to the entropy.'; cls='bg-warning'; }
+            else if (s.length < 6)    { level='weak';   msg=`Too short (${s.length} chars). Easy to guess. Use at least 6 chars.`; cls='bg-danger'; }
+            else if (s.length < 16)   { level='ok';     msg=`OK (${s.length} chars). Longer/ harder-to-guess is better.`; cls='bg-warning'; }
+            else                      { level='strong'; msg=`Strong (${s.length} chars). Nice.`; cls='bg-success'; }
             this.saltStatus = { level, msg, cls };
         },
 
