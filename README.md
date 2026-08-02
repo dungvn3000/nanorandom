@@ -4,10 +4,11 @@
 
 Client-side BIP39 mnemonic seed & password generator powered by live Nano blockchain blockhashes.
 
-NanoRandom generates BIP39 seed phrases (12 / 15 / 18 / 24 words) by combining a
-secure-random user salt with real-time blockhashes from the Nano (XNO) network,
-then running everything through SHA-256 — entirely in your browser. It also
-derives strong random passwords from the same entropy.
+NanoRandom generates BIP39 seed phrases (12 / 15 / 18 / 24 words) by combining an
+auto-generated **system salt** (128-bit CSPRNG) + an optional **user salt** (your
+own text) + **real-time blockhashes** from the Nano (XNO) network, then running
+everything through SHA-256 — entirely in your browser. It also derives strong
+random passwords from the same entropy.
 
 No backend. No tracking. No data ever leaves your machine.
 
@@ -16,8 +17,10 @@ No backend. No tracking. No data ever leaves your machine.
 ## Features
 
 - **Live Nano blockhashes** — polled every 3s from `api.nanexplorer.com/last-blocks`
-- **Secure user salt** — 128-bit random value generated on load with the
-  browser's `crypto.getRandomValues()`, editable / regenerable
+- **Auto system salt** — 128-bit CSPRNG from `crypto.getRandomValues()`, readonly,
+  regenerable with one click
+- **Optional user salt** — you may type any text as a second, personal layer; the
+  indicator warns if it's empty / very short
 - **BIP39 compliant** — official 2048-word English wordlist, SHA-256 checksum
 - **Four word lengths** — 12 / 15 / 18 / 24 words (128 / 160 / 192 / 256 bits)
 - **Password generator** — derives passwords from the current entropy with
@@ -30,16 +33,23 @@ No backend. No tracking. No data ever leaves your machine.
 
 ## How it works
 
-The entropy is built from two independent sources and mixed via SHA-256. The
-**last 16 live blockhashes** (kept in a rolling in-memory buffer) are
-concatenated to the user salt:
+The entropy is built from three independent sources and mixed via SHA-256. The
+**last 16 live blockhashes** (kept in a rolling in-memory buffer) are concatenated
+with the auto-generated system salt and the optional user salt:
 
 ```
-entropy   = SHA-256( utf8(userSalt) ++ hexBytes(last16Blockhashes) )[0 : ENT_bits/8]
+entropy   = SHA-256( utf8(systemSalt) ++ utf8(userSalt) ++ hexBytes(last16Blockhashes) )[0 : ENT_bits/8]
 checksum  = SHA-256(entropy)[0 : ENT/32 bits]
 bits      = bin(entropy) ++ bin(checksum)
 mnemonic  = [ WORDLIST[bits[i:i+11]]  for i in 0,11,22,... ]
 ```
+
+- **systemSalt** &mdash; 128-bit CSPRNG from `crypto.getRandomValues()`, readonly,
+  regenerable anytime.
+- **userSalt** &mdash; optional text; the salt indicator warns if empty/too short.
+  Adds a second personal layer.
+- **last16Blockhashes** &mdash; public, verifiable entropy pulled live from the
+  Nano network.
 
 | Words | Entropy | Checksum | Total bits |
 |------:|--------:|---------:|-----------:|
@@ -103,12 +113,13 @@ Then open <http://localhost:8080>.
 
 ## Security notes
 
-- The seed and the user salt never leave your browser — the only network call
+- The seed and both salts never leave your browser — the only network call
   is to the public Nano Explorer API to read live blockhashes.
-- Blockhashes are public, so the secure-random user salt is the secret part
-  that makes the entropy unpredictable to the outside world.
-- For holding real funds, consider an offline/air-gapped device and verify the seed on
-  the device screen.
+- Blockhashes are public, so the **system salt** (128-bit CSPRNG) is the secret
+  anchor that keeps each seed private; the **user salt** adds a second layer
+  if you want extra unpredictability.
+- For holding real funds, consider an offline/air-gapped device and verify
+  the seed on the device screen.
 - This tool is provided as-is, with no warranty. Use at your own risk.
 
 ## License
