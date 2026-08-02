@@ -144,4 +144,4 @@ Generated seed phrases are for **testing and learning**. Use at your own risk.
 
 ## License
 
-MIT
+[Apache License 2.0](LICENSE)
