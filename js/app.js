@@ -13,13 +13,14 @@ function seedApp() {
         // Generator state
         page: 'home',
         wordCount: 12,
+        systemSalt: '',
         userSalt: '',
         generating: false,
         genTimer: null,
         words: [],
         entropyHex: '',
         checksumHex: '',
-        userSaltHex: '',
+        systemSaltHex: '',
         blockBufferHexShort: '',
         generatedAt: '',
 
@@ -73,14 +74,14 @@ function seedApp() {
         updateSaltStatus() {
             const s = this.userSalt || '';
             let level, msg, cls;
-            if (!s.length)            { level='empty';  msg='Empty salt. Your seed is fully predictable by anyone. Please generate one or enter some text.'; cls='bg-danger'; }
-            else if (s.length < 6)    { level='weak';   msg=`Salt too short (${s.length} chars). Very easy to guess. Use at least 6 chars or click ↻.`; cls='bg-danger'; }
-            else if (s.length < 16)   { level='ok';     msg=`Salt OK (${s.length} chars). Prefer 16+ random chars or keep the auto-generated one.`; cls='bg-warning'; }
-            else                      { level='strong'; msg=`Salt strength: strong (${s.length} chars).`; cls='bg-success'; }
+            if (!s.length)            { level='empty';  msg='No custom salt entered. Seed uses only system salt + blockhash — predictable to anyone else knowing both. Enter some text below to lock it.'; cls='bg-danger'; }
+            else if (s.length < 6)    { level='weak';   msg=`Custom salt too short (${s.length} chars). Very easy to guess. Use at least 6 chars.`; cls='bg-danger'; }
+            else if (s.length < 16)   { level='ok';     msg=`Custom salt OK (${s.length} chars). Longer/ harder-to-guess is better.`; cls='bg-warning'; }
+            else                      { level='strong'; msg=`Custom salt strength: strong (${s.length} chars).`; cls='bg-success'; }
             this.saltStatus = { level, msg, cls };
         },
 
-        // Generate a new secure random salt (16 bytes -> 32 hex chars)
+        // Generate a new secure random system salt (16 bytes -> 32 hex chars)
         regenSalt() {
             const arr = new Uint8Array(16);
             if (crypto.getRandomValues) {
@@ -88,7 +89,7 @@ function seedApp() {
             } else {
                 for (let i = 0; i < arr.length; i++) arr[i] = Math.floor(Math.random() * 256);
             }
-            this.userSalt = BIP39.bytesToHex(Array.from(arr));
+            this.systemSalt = BIP39.bytesToHex(Array.from(arr));
             this.scheduleGenerate();
         },
 
@@ -166,20 +167,23 @@ function seedApp() {
             }, 250);
         },
 
-        // Cache for salt bytes (avoids re-encoding the same salt repeatedly)
+        // Cache for salt bytes (avoids re-encoding the same salts repeatedly)
         _saltCache: null,
         _saltCacheKey: null,
 
         _saltBytes() {
-            const key = this.userSalt || '';
+            const key = this.systemSalt + '|' + this.userSalt;
             if (this._saltCacheKey !== key) {
                 this._saltCacheKey = key;
-                this._saltCache = key ? Array.from(new TextEncoder().encode(key)) : [];
+                const out = [];
+                if (this.systemSalt) out.push(...Array.from(new TextEncoder().encode(this.systemSalt)));
+                if (this.userSalt)   out.push(...Array.from(new TextEncoder().encode(this.userSalt)));
+                this._saltCache = out;
             }
             return this._saltCache;
         },
 
-        // Build entropy bytes from accumulated blockhashes + user salt
+        // Build entropy bytes from blockhashes + system salt + user salt
         async blockHashEntropy(byteLen) {
             const combined = this.blockBuffer.join(''); // buffer already capped at 16
             // Convert hex chars to bytes
@@ -187,7 +191,7 @@ function seedApp() {
             for (let i = 0; i + 1 < combined.length; i += 2) {
                 rawBytes.push(parseInt(combined.slice(i, i + 2), 16));
             }
-            // Append user salt bytes (UTF-8, cached)
+            // Append system salt + user salt (UTF-8, cached)
             rawBytes.push(...this._saltBytes());
             // SHA-256 to smooth distribution and produce 32 bytes
             let hashed = await BIP39.sha256(rawBytes);
@@ -224,7 +228,7 @@ function seedApp() {
 
                 // Update derived display values (About tab only - skip if hidden)
                 if (this.page === 'about') {
-                    this.userSaltHex = this.userSalt ? BIP39.bytesToHex(this._saltBytes()) : '';
+                    this.systemSaltHex = this.systemSalt ? BIP39.bytesToHex(this._saltBytes()) : '';
                     const joined = this.blockBuffer.join('');
                     this.blockBufferHexShort = joined.length > 48 ? joined.slice(0, 48) + '...' : joined;
                     const csHash = await BIP39.sha256(entropyBytes);
@@ -284,13 +288,11 @@ function seedApp() {
         },
 
         // ---- Password generator ----
-        // HKDF-like expansion: repeatedly SHA-256(entropyHex || counter || salt)
+        // HKDF-like expansion: repeatedly SHA-256(entropyHex || counter || salts)
         async expandEntropy(byteLen) {
             const out = [];
             const base = BIP39.hexToBytes(this.entropyHex || '00');
-            const saltBytes = this.userSalt
-                ? Array.from(new TextEncoder().encode(this.userSalt))
-                : [];
+            const saltBytes = Array.from(this._saltBytes());
             let counter = 0;
             while (out.length < byteLen) {
                 const input = base.concat([counter & 0xff], saltBytes);

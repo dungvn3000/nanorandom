@@ -118,7 +118,7 @@
                 <div class="card mb-4">
                     <div class="card-body">
                         <div class="row g-3 align-items-center">
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <label class="form-label">Word count</label>
                                 <select class="form-select" x-model="wordCount" @change="scheduleGenerate()">
                                     <option value="12">12 words</option>
@@ -127,40 +127,41 @@
                                     <option value="24">24 words</option>
                                 </select>
                             </div>
-                            <div class="col-md-5">
-                                <label class="form-label">User salt (extra entropy)</label>
-                                <div class="input-group">
-                                    <input type="text" class="form-control mono" x-model="userSalt"
-                                        :class="{
-                                            'border-danger': saltStatus.level === 'empty' || saltStatus.level === 'weak',
-                                            'border-warning': saltStatus.level === 'ok',
-                                            'border-success': saltStatus.level === 'strong'
-                                        }"
-                                        placeholder="Enter any text to mix with blockhash..."
-                                        @input="scheduleGenerate()">
-                                    <button class="btn btn-outline-primary" type="button" @click="regenSalt()" title="Regenerate secure random salt">
+                            <div class="col-md-3">
+                                <label class="form-label">System salt (auto)</label>
+                                <div class="input-group input-group-sm">
+                                    <input type="text" class="form-control mono" x-model="systemSalt" readonly title="Auto-generated 128-bit secure random. Not editable.">
+                                    <button class="btn btn-outline-primary" type="button" @click="regenSalt()" title="Regenerate secure random system salt">
                                         <i class="bi bi-arrow-repeat"></i>
                                     </button>
                                 </div>
-                                <!-- Salt strength indicator -->
+                                <div class="form-text">Auto-generated 128-bit CSPRNG.</div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">User salt (your input) <span class="badge ms-1" :class="saltStatus.cls" x-text="saltStatus.level === 'strong' ? 'Strong' : saltStatus.level === 'ok' ? 'OK' : saltStatus.level === 'weak' ? 'Weak' : 'Empty'"></span></label>
+                                <input type="text" class="form-control mono" x-model="userSalt"
+                                    :class="{
+                                        'border-danger': saltStatus.level === 'empty' || saltStatus.level === 'weak',
+                                        'border-warning': saltStatus.level === 'ok',
+                                        'border-success': saltStatus.level === 'strong'
+                                    }"
+                                    placeholder="Enter any text to mix with blockhash + system salt..."
+                                    @input="scheduleGenerate()">
                                 <div class="salt-indicator mt-2">
                                     <div class="salt-bar">
                                         <div class="salt-bar-fill" :class="saltStatus.cls" :style="saltStatus.level === 'strong' ? 'width:100%' : saltStatus.level === 'ok' ? 'width:55%' : saltStatus.level === 'weak' ? 'width:25%' : 'width:0%'"></div>
                                     </div>
-                                    <div class="salt-msg">
-                                        <span class="badge" :class="saltStatus.cls" x-text="saltStatus.level === 'strong' ? 'Strong' : saltStatus.level === 'ok' ? 'OK' : saltStatus.level === 'weak' ? 'Weak' : 'Empty'"></span>
-                                        <span class="salt-msg-text" x-text="saltStatus.msg"></span>
-                                    </div>
+                                    <div class="salt-msg small salt-msg-text" x-text="saltStatus.msg"></div>
                                 </div>
                             </div>
-                            <div class="col-md-3 text-md-end">
+                            <div class="col-md-1 text-md-end">
                                 <span class="badge bg-secondary" x-show="blockCount !== null">
                                     <i class="bi bi-broadcast"></i> Blocks: <span x-text="blockCount"></span>
                                 </span>
                             </div>
                         </div>
                         <div class="form-text mt-2">
-                            <span class="text-info"><i class="bi bi-info-circle"></i> Entropy = SHA-256(userSalt + blockhash). Salt is a secure random 128-bit value on load. Click <i class="bi bi-arrow-repeat"></i> to regenerate.</span>
+                            <span class="text-info"><i class="bi bi-info-circle"></i> Entropy = SHA-256(systemSalt + userSalt + blockhash). System salt is 128-bit CSPRNG; user salt is optional but recommended for extra unpredictability.</span>
                         </div>
                     </div>
                 </div>
@@ -275,32 +276,37 @@
                         <!-- Pipeline -->
                         <div class="pipeline">
                             <div class="pipe-step">
-                                <div class="pipe-title">1. User salt</div>
+                                <div class="pipe-title">1. System salt</div>
+                                <div class="pipe-value mono" x-text="systemSalt ? systemSalt.slice(0,8) + '...' : '-'"></div>
+                            </div>
+                            <div class="pipe-arrow">+</div>
+                            <div class="pipe-step">
+                                <div class="pipe-title">2. User salt</div>
                                 <div class="pipe-value mono" x-text="userSalt ? '&quot;' + userSalt + '&quot;' : '(empty)'"></div>
                             </div>
-                            <div class="pipe-arrow">&rarr;</div>
+                            <div class="pipe-arrow">+</div>
                             <div class="pipe-step">
-                                <div class="pipe-title">2. Live blockhash(es)</div>
+                                <div class="pipe-title">3. Live blockhash(es)</div>
                                 <div class="pipe-value mono" x-text="latestBlock.hash ? latestBlock.hash.slice(0,16) + '...' : '-'"></div>
                             </div>
                             <div class="pipe-arrow">&rarr;</div>
                             <div class="pipe-step">
-                                <div class="pipe-title">3. Concatenate bytes</div>
-                                <div class="pipe-value mono">salt + hash bytes</div>
+                                <div class="pipe-title">4. Concatenate</div>
+                                <div class="pipe-value mono">salt + userSalt + hash bytes</div>
                             </div>
                             <div class="pipe-arrow">&rarr;</div>
                             <div class="pipe-step">
-                                <div class="pipe-title">4. SHA-256</div>
+                                <div class="pipe-title">5. SHA-256</div>
                                 <div class="pipe-value mono">hash(x) = 32B</div>
                             </div>
                             <div class="pipe-arrow">&rarr;</div>
                             <div class="pipe-step">
-                                <div class="pipe-title">5. Entropy</div>
+                                <div class="pipe-title">6. Entropy</div>
                                 <div class="pipe-value mono" x-text="entropyHex ? entropyHex.slice(0,16) + '...' : '-'"></div>
                             </div>
                             <div class="pipe-arrow">&rarr;</div>
                             <div class="pipe-step">
-                                <div class="pipe-title">6. BIP39 mnemonic</div>
+                                <div class="pipe-title">7. BIP39 mnemonic</div>
                                 <div class="pipe-value mono" x-text="wordCount + ' words'"></div>
                             </div>
                         </div>
@@ -308,7 +314,7 @@
                         <!-- Formula -->
                         <div class="formula-box">
                             <div class="formula-label">Formula</div>
-                            <pre class="formula">entropy = SHA-256( utf8(userSalt) ++ hexBytes(blockhashes) )[0 : ENT_bits/8]
+                            <pre class="formula">entropy = SHA-256( utf8(systemSalt) ++ utf8(userSalt) ++ hexBytes(blockhashes) )[0 : ENT_bits/8]
 
 checksum = SHA-256(entropy)[0 : ENT/32 bits]   <span class="text-muted"># 4 / 5 / 6 / 8 bits</span>
 
@@ -321,8 +327,14 @@ mnemonic = [ WORDLIST[bits[i:i+11]]  for i in 0,11,22,... ]</pre>
                         <div class="row g-2 mt-2">
                             <div class="col-md-6">
                                 <div class="block-info">
-                                    <label>userSalt (UTF-8 hex)</label>
-                                    <div class="block-value mono" x-text="userSaltHex || '-'"></div>
+                                    <label>systemSalt (UTF-8 hex)</label>
+                                    <div class="block-value mono" x-text="systemSaltHex || '-'"></div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="block-info">
+                                    <label>userSalt (raw)</label>
+                                    <div class="block-value mono" x-text="userSalt || '(empty)'"></div>
                                 </div>
                             </div>
                             <div class="col-md-6">
