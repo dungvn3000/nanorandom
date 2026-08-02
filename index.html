@@ -129,13 +129,13 @@
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label">System salt (auto)</label>
-                                <div class="input-group input-group-sm">
+                                <div class="input-group">
                                     <input type="text" class="form-control mono" x-model="systemSalt" readonly title="Auto-generated 128-bit secure random. Not editable.">
                                     <button class="btn btn-outline-primary" type="button" @click="regenSalt()" title="Regenerate secure random system salt">
                                         <i class="bi bi-arrow-repeat"></i>
                                     </button>
                                 </div>
-                                <div class="form-text">Auto-generated 128-bit CSPRNG.</div>
+                                <div class="form-text text-info">Auto-generated 128-bit CSPRNG.</div>
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label">User salt (your input) <span class="badge ms-1" :class="saltStatus.cls" x-text="saltStatus.level === 'strong' ? 'Strong' : saltStatus.level === 'ok' ? 'OK' : saltStatus.level === 'weak' ? 'Weak' : 'Empty'"></span></label>
