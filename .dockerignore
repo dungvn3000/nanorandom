@@ -1,0 +1,23 @@
+# VCS
+.git/
+.gitignore
+
+# Docs
+LICENSE
+README.md
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# Logs / runtime
+*.log
+*.pid
+
+# Node (not used at runtime)
+node_modules/
+package.json
+package-lock.json

@@ -111,6 +111,27 @@ php -S localhost:8080
 
 Then open <http://localhost:8080>.
 
+## Run with Docker
+
+The project ships with a `Dockerfile` + `Caddyfile` (Caddy serves the static
+files, gzips them, and sets long-cache + security headers).
+
+```bash
+# Build the image
+docker build -t nanorandom .
+
+# Run on http://localhost:8080
+docker run -d -p 8080:80 --name nanorandom nanorandom
+
+# Open http://localhost:8080
+```
+
+Stop and remove when done:
+
+```bash
+docker stop nanorandom && docker rm nanorandom
+```
+
 ## Security notes
 
 - The seed and both salts never leave your browser — the only network call

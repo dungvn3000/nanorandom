@@ -1,0 +1,30 @@
+:80 {
+    root * /srv
+    file_server
+    encode gzip zstd
+    try_files {path} /index.html
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "no-referrer"
+        Permissions-Policy "geolocation=(), microphone=(), camera=()"
+        Access-Control-Allow-Origin "*"
+    }
+
+    @static {
+        path *.css *.js *.png *.ico *.webmanifest
+    }
+    header @static Cache-Control "public, max-age=2592000, immutable"
+
+    @html {
+        path *.html /
+    }
+    header @html Cache-Control "public, max-age=300"
+
+    @seo {
+        path /robots.txt /sitemap.xml /site.webmanifest
+    }
+    header @seo Cache-Control "public, max-age=3600"
+}
