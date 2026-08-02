@@ -122,6 +122,26 @@ Then open <http://localhost:8080>.
   the seed on the device screen.
 - This tool is provided as-is, with no warranty. Use at your own risk.
 
+## Disclaimer
+
+NanoRandom is an **educational & experimental tool**. It is provided **"AS IS"**,
+without any warranty of any kind, express or implied, including but not limited
+to merchantability, fitness for a particular purpose, or non-infringement.
+
+**The authors and contributors are NOT responsible** for any lost funds, damaged
+wallets, leaked keys, or other damage arising from the use or misuse of this
+tool.
+
+This page runs **100% client-side**. Nothing is sent to any server except the
+public Nano explorer API used to poll live blockhashes. The randomness depends
+on your browser's `crypto.getRandomValues()` and the live blockhash feed.
+
+Before storing real funds, **always verify your seed in at least 2 independent
+offline tools** and ideally offline. **Never share your seed or the
+salts (system + user)** with anyone.
+
+Generated seed phrases are for **testing and learning**. Use at your own risk.
+
 ## License
 
 MIT
