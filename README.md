@@ -30,10 +30,12 @@ No backend. No tracking. No data ever leaves your machine.
 
 ## How it works
 
-The entropy is built from two independent sources and mixed via SHA-256:
+The entropy is built from two independent sources and mixed via SHA-256. The
+**last 16 live blockhashes** (kept in a rolling in-memory buffer) are
+concatenated to the user salt:
 
 ```
-entropy   = SHA-256( utf8(userSalt) ++ hexBytes(blockhashes) )[0 : ENT_bits/8]
+entropy   = SHA-256( utf8(userSalt) ++ hexBytes(last16Blockhashes) )[0 : ENT_bits/8]
 checksum  = SHA-256(entropy)[0 : ENT/32 bits]
 bits      = bin(entropy) ++ bin(checksum)
 mnemonic  = [ WORDLIST[bits[i:i+11]]  for i in 0,11,22,... ]
@@ -70,9 +72,15 @@ nanorandom/
 ├── index.html        # Markup (single page, 2 tabs: Generator + About)
 ├── css/
 │   └── style.css     # Dark theme Nano styling
-└── js/
-    ├── bip39.js      # Official 2048-word wordlist + mnemonic helpers
-    └── app.js        # Alpine.js app (API polling, entropy, password gen)
+├── js/
+│   ├── bip39.js      # Official 2048-word wordlist + mnemonic helpers
+│   └── app.js        # Alpine.js app (API polling, entropy, password gen)
+├── favicon.png       # 192x192 icon
+├── favicon-512.png   # 512x512 icon (PWA)
+├── og-image.png      # Open Graph share image
+├── robots.txt        # SEO
+├── sitemap.xml       # SEO
+└── site.webmanifest  # PWA manifest
 ```
 
 ## Run locally
