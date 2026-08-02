@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NanoRandom — Client-side BIP39 Seed Phrase Generator from Live Nano Blockhashes</title>
+    <meta name="description" content="NanoRandom generates BIP39 seed phrases (12/15/18/24 words) and strong passwords by combining a secure-random user salt with real-time blockhashes from the Nano (XNO) network. 100% client-side, no tracking.">
+    <meta name="keywords" content="nano,random,seed phrase,mnemonic,bip39,xno,blockhash,entropy,crypto,nanexplorer,client-side,wallet generator">
+    <meta name="author" content="nanorandom.dev">
+    <meta name="robots" content="index, follow, max-image-preview:large">
+    <link rel="canonical" href="https://nanorandom.dev/">
+    <meta name="theme-color" content="#0d1117">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="apple-touch-icon" href="favicon.png">
+    <link rel="manifest" href="site.webmanifest">
+
+    <!-- OpenGraph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://nanorandom.dev/">
+    <meta property="og:title" content="NanoRandom — BIP39 Seed Generator from Live Nano Blockhashes">
+    <meta property="og:description" content="Combined entropy from your local CSPRNG + live Nano blockhashes. 100% client-side, auditable, simple.">
+    <meta property="og:image" content="https://nanorandom.dev/og-image.png">
+    <meta property="og:site_name" content="NanoRandom">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://nanorandom.dev/">
+    <meta name="twitter:title" content="NanoRandom — BIP39 Seed Generator from Live Nano Blockhashes">
+    <meta name="twitter:description" content="Generate auditable BIP39 mnemonics by combining your browser's CSPRNG with live Nano blockhashes. 100% client-side.">
+    <meta name="twitter:image" content="https://nanorandom.dev/og-image.png">
+
+    <!-- Structured data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "NanoRandom",
+      "url": "https://nanorandom.dev/",
+      "description": "Client-side BIP39 mnemonic seed phrase generator mixing a secure user salt with live Nano (XNO) blockhashes.",
+      "applicationCategory": "UtilitiesApplication",
+      "operatingSystem": "Web",
+      "browserRequirements": "Requires a modern browser with Web Crypto API support.",
+      "isAccessibleForFree": true,
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "creator": { "@type": "Organization", "name": "tadu.cloud", "url": "https://tadu.cloud" },
+      "inLanguage": "en-US",
+      "keywords": "BIP39, seed phrase, mnemonic, Nano, XNO, blockhash, entropy, crypto, wallet"
+    }
+    </script>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="css/style.css" rel="stylesheet">
+</head>
+<body>
+    <div x-data="seedApp()">
+        <!-- Header -->
+        <nav class="navbar navbar-dark sticky-top shadow-sm">
+            <div class="container-fluid">
+                <span class="navbar-brand mb-0 h1">
+                    <i class="bi bi-shield-lock-fill"></i> NanoRandom
+                </span>
+                <div class="d-flex align-items-center gap-3">
+                    <div class="nav-pill-group">
+                        <button class="nav-pill" :class="page === 'home' ? 'active' : ''" @click="page = 'home'">
+                            <i class="bi bi-shuffle"></i> Generator
+                        </button>
+                        <button class="nav-pill" :class="page === 'about' ? 'active' : ''" @click="page = 'about'">
+                            <i class="bi bi-info-circle"></i> About
+                        </button>
+                    </div>
+                    <a href="https://github.com/dungvn3000/nanorandom" target="_blank" rel="noopener"
+                       class="gh-link" title="View source on GitHub">
+                        <i class="bi bi-github"></i>
+                    </a>
+                    <span class="badge ws-badge" :class="connected ? 'bg-success' : 'bg-danger'">
+                        <span class="dot" :class="connected ? 'dot-on' : 'dot-off'"></span>
+                        <span x-text="connected ? 'API Live' : 'API Off'"></span>
+                    </span>
+                </div>
+            </div>
+        </nav>
+
+        <main class="container py-4">
+            <!-- ================= HOME / GENERATOR ================= -->
+            <div x-show="page === 'home'">
+                <!-- Block info -->
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-blockchain-tip"></i> Block Lattice - Live Block</span>
+                        <span class="text-muted small" x-show="latestBlock.hash">Updated: <span x-text="latestBlockTime"></span></span>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-2">
+                            <div class="col-md-6">
+                                <div class="block-info">
+                                    <label>Block Hash</label>
+                                    <a :href="'https://nanexplorer.com/nano/blocks/' + latestBlock.hash" target="_blank" rel="noopener"
+                                       class="block-value mono block-link" x-text="latestBlock.hash || 'Awaiting block...'"></a>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="block-info">
+                                    <label>Account</label>
+                                    <a :href="'https://nanexplorer.com/nano/accounts/' + latestBlock.account" target="_blank" rel="noopener"
+                                       class="block-value mono block-link" x-text="latestBlock.account || '-'"></a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <label class="text-muted small">Source: https://api.nanexplorer.com/last-blocks?network=nano</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Generator controls -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <div class="row g-3 align-items-center">
+                            <div class="col-md-4">
+                                <label class="form-label">Word count</label>
+                                <select class="form-select" x-model="wordCount" @change="scheduleGenerate()">
+                                    <option value="12">12 words</option>
+                                    <option value="15">15 words</option>
+                                    <option value="18">18 words</option>
+                                    <option value="24">24 words</option>
+                                </select>
+                            </div>
+                            <div class="col-md-5">
+                                <label class="form-label">User salt (extra entropy)</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control mono" x-model="userSalt"
+                                        :class="{
+                                            'border-danger': saltStatus.level === 'empty' || saltStatus.level === 'weak',
+                                            'border-warning': saltStatus.level === 'ok',
+                                            'border-success': saltStatus.level === 'strong'
+                                        }"
+                                        placeholder="Enter any text to mix with blockhash..."
+                                        @input="scheduleGenerate()">
+                                    <button class="btn btn-outline-primary" type="button" @click="regenSalt()" title="Regenerate secure random salt">
+                                        <i class="bi bi-arrow-repeat"></i>
+                                    </button>
+                                </div>
+                                <!-- Salt strength indicator -->
+                                <div class="salt-indicator mt-2">
+                                    <div class="salt-bar">
+                                        <div class="salt-bar-fill" :class="saltStatus.cls" :style="saltStatus.level === 'strong' ? 'width:100%' : saltStatus.level === 'ok' ? 'width:55%' : saltStatus.level === 'weak' ? 'width:25%' : 'width:0%'"></div>
+                                    </div>
+                                    <div class="salt-msg">
+                                        <span class="badge" :class="saltStatus.cls" x-text="saltStatus.level === 'strong' ? 'Strong' : saltStatus.level === 'ok' ? 'OK' : saltStatus.level === 'weak' ? 'Weak' : 'Empty'"></span>
+                                        <span class="salt-msg-text" x-text="saltStatus.msg"></span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 text-md-end">
+                                <span class="badge bg-secondary" x-show="blockCount !== null">
+                                    <i class="bi bi-broadcast"></i> Blocks: <span x-text="blockCount"></span>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="form-text mt-2">
+                            <span class="text-info"><i class="bi bi-info-circle"></i> Entropy = SHA-256(userSalt + blockhash). Salt is a secure random 128-bit value on load. Click <i class="bi bi-arrow-repeat"></i> to regenerate.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Seed phrase display -->
+                <div class="card mb-4" x-show="words.length">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-key"></i> Seed Phrase (<span x-text="words.length"></span> words)</span>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-secondary" @click="copy()">
+                                <i class="bi bi-clipboard"></i> Copy
+                            </button>
+                            <button class="btn btn-outline-secondary" @click="download()">
+                                <i class="bi bi-download"></i> Download
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="seed-grid">
+                            <template x-for="(word, idx) in words" :key="idx">
+                                <div class="seed-item">
+                                    <span class="seed-num" x-text="idx + 1"></span>
+                                    <span class="seed-word" x-text="word"></span>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                    <div class="card-footer text-muted small">
+                        <div class="row">
+                            <div class="col">Entropy: <span class="mono" x-text="entropyHex"></span></div>
+                            <div class="col text-end">Generated at: <span x-text="generatedAt"></span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Password generator from entropy -->
+                <div class="card mb-4" x-show="words.length">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-keyboard"></i> Random Password from Entropy</span>
+                        <button class="btn btn-outline-secondary btn-sm" @click="copyPassword()" x-show="password">
+                            <i class="bi bi-clipboard"></i> Copy
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3 mb-3">
+                            <div class="col-6 col-md-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="pwUpper" x-model="pwOptions.upper" @change="schedulePwGen()">
+                                    <label class="form-check-label" for="pwUpper">Uppercase <code>ABC</code></label>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="pwLower" x-model="pwOptions.lower" @change="schedulePwGen()">
+                                    <label class="form-check-label" for="pwLower">Lowercase <code>abc</code></label>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="pwNum" x-model="pwOptions.numbers" @change="schedulePwGen()">
+                                    <label class="form-check-label" for="pwNum">Numbers <code>123</code></label>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="pwSym" x-model="pwOptions.symbols" @change="schedulePwGen()">
+                                    <label class="form-check-label" for="pwSym">Symbols <code>!-;</code></label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row g-3 align-items-center">
+                            <div class="col-md-3">
+                                <label class="form-label">Length: <span class="badge bg-primary" x-text="pwOptions.length"></span></label>
+                            </div>
+                            <div class="col-md-9">
+                                <input type="range" class="form-range" min="8" max="128" step="1" x-model.number="pwOptions.length" @input="schedulePwGen()">
+                            </div>
+                        </div>
+
+                        <div class="password-box" x-show="password">
+                            <div class="password-text mono" x-text="password"></div>
+                        </div>
+
+                        <div class="password-strength mt-3" x-show="password">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="small">Strength</span>
+                                <span class="badge" :class="pwStrength.cls" x-text="pwStrength.label"></span>
+                            </div>
+                            <div class="progress" style="height: 6px;">
+                                <div class="progress-bar" :class="pwStrength.cls" :style="'width:' + pwStrength.percent + '%'"></div>
+                            </div>
+                            <div class="text-muted small mt-1">
+                                <span x-text="pwStrength.percent"></span>% / ~<span x-text="Math.round((password.length * Math.log2(86)) / 1.28)"></span> bits entropy
+                            </div>
+                        </div>
+
+                        <div class="text-muted small mt-3">
+                            <i class="bi bi-info-circle"></i> Password is derived by expanding the seed entropy (SHA-256 chain over entropy+salt+counter), then mapping bytes to the chosen charset.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= ABOUT ================= -->
+            <div x-show="page === 'about'" x-transition>
+                <!-- How it works / formula -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <i class="bi bi-calculator"></i> How your seed is generated (BIP39)
+                    </div>
+                    <div class="card-body">
+                        <!-- Pipeline -->
+                        <div class="pipeline">
+                            <div class="pipe-step">
+                                <div class="pipe-title">1. User salt</div>
+                                <div class="pipe-value mono" x-text="userSalt ? '&quot;' + userSalt + '&quot;' : '(empty)'"></div>
+                            </div>
+                            <div class="pipe-arrow">&rarr;</div>
+                            <div class="pipe-step">
+                                <div class="pipe-title">2. Live blockhash(es)</div>
+                                <div class="pipe-value mono" x-text="latestBlock.hash ? latestBlock.hash.slice(0,16) + '...' : '-'"></div>
+                            </div>
+                            <div class="pipe-arrow">&rarr;</div>
+                            <div class="pipe-step">
+                                <div class="pipe-title">3. Concatenate bytes</div>
+                                <div class="pipe-value mono">salt + hash bytes</div>
+                            </div>
+                            <div class="pipe-arrow">&rarr;</div>
+                            <div class="pipe-step">
+                                <div class="pipe-title">4. SHA-256</div>
+                                <div class="pipe-value mono">hash(x) = 32B</div>
+                            </div>
+                            <div class="pipe-arrow">&rarr;</div>
+                            <div class="pipe-step">
+                                <div class="pipe-title">5. Entropy</div>
+                                <div class="pipe-value mono" x-text="entropyHex ? entropyHex.slice(0,16) + '...' : '-'"></div>
+                            </div>
+                            <div class="pipe-arrow">&rarr;</div>
+                            <div class="pipe-step">
+                                <div class="pipe-title">6. BIP39 mnemonic</div>
+                                <div class="pipe-value mono" x-text="wordCount + ' words'"></div>
+                            </div>
+                        </div>
+
+                        <!-- Formula -->
+                        <div class="formula-box">
+                            <div class="formula-label">Formula</div>
+                            <pre class="formula">entropy = SHA-256( utf8(userSalt) ++ hexBytes(blockhashes) )[0 : ENT_bits/8]
+
+checksum = SHA-256(entropy)[0 : ENT/32 bits]   <span class="text-muted"># 4 / 5 / 6 / 8 bits</span>
+
+bits     = bin(entropy) ++ bin(checksum)       <span class="text-muted"># 132 / 165 / 198 / 264 bits</span>
+
+mnemonic = [ WORDLIST[bits[i:i+11]]  for i in 0,11,22,... ]</pre>
+                        </div>
+
+                        <!-- Live values -->
+                        <div class="row g-2 mt-2">
+                            <div class="col-md-6">
+                                <div class="block-info">
+                                    <label>userSalt (UTF-8 hex)</label>
+                                    <div class="block-value mono" x-text="userSaltHex || '-'"></div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="block-info">
+                                    <label>blockhash buffer (last <span x-text="blockBuffer.length"></span> hashes, joined)</label>
+                                    <div class="block-value mono" x-text="blockBufferHexShort || '-'"></div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="block-info">
+                                    <label>entropy (hex)</label>
+                                    <div class="block-value mono" x-text="entropyHex || '-'"></div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="block-info">
+                                    <label>checksum (hex of SHA-256(entropy))</label>
+                                    <div class="block-value mono" x-text="checksumHex || '-'"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Why Nano -->
+                <div class="card mb-4 why-nano-card">
+                    <div class="card-header">
+                        <i class="bi bi-lightning-charge"></i> Why Nano?
+                    </div>
+                    <div class="card-body">
+                        <p class="why-lead">
+                            <strong>Nano (XNO)</strong> is a feeless, eco-friendly cryptocurrency with a unique
+                            <em>block-lattice</em> architecture. It is perfectly suited as a live entropy source for this tool:
+                        </p>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <div class="why-item">
+                                    <i class="bi bi-collection-fill"></i>
+                                    <b>Blocks confirmed continuously</b>
+                                    <span>Nano settles transactions &mdash; on average one or more per second, and free &mdash; so fresh blockhashes keep arriving 24/7. We never run out of new randomness.</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="why-item">
+                                    <i class="bi bi-fingerprint"></i>
+                                    <b>256-bit blockhashes</b>
+                                    <span>Each confirmation produces a 256-bit SHA-256-family hash that no one predicted beforehand. It is a public, verifiable source of high entropy bits.</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="why-item">
+                                    <i class="bi bi-check-circle-fill"></i>
+                                    <b>Publicly verifiable</b>
+                                    <span>Any hash you see in this app links straight to
+                                        <a href="https://nanexplorer.com/nano/blocks/" target="_blank" rel="noopener">nanexplorer.com</a>
+                                        so anyone can audit that the entropy actually came from a confirmed Nano block &mdash; transparency without hiding anything.</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="why-item">
+                                    <i class="bi bi-feather"></i>
+                                    <b>Green &amp; feeless</b>
+                                    <span>No mining, no wasted energy, no cost per block. The "noise" of real user transactions keeps the pipeline running without contributing to carbon or network congestion.</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="alert alert-dark why-tip">
+                            <i class="bi bi-shield-shaded"></i>
+                            But remember: <b>public blockhashes alone are not secret</b>. Your unique <b>user salt</b> (128-bit, client-side) is what makes each generated seed yours and unpredictable to anyone else on the internet.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Why NanoRandom / Coldcard lesson -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <i class="bi bi-bug"></i> Why NanoRandom? &mdash; The Coldcard 2026 Lesson
+                    </div>
+                    <div class="card-body">
+                        <p class="why-lead">
+                            In <strong>July 2026</strong> a single hidden firmware bug in a famous hardware wallet
+                            <em>silently replaced its hardware TRNG with a non-cryptographic PRNG for years</em>.
+                            On July 30, 2026 an attacker recreated the weak seeds offline and drained about
+                            <strong>594 BTC (~ $38M)</strong> from vulnerable wallets.
+                        </p>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <div class="why-item">
+                                    <i class="bi bi-exclamation-octagon"></i>
+                                    <b>Single point of failure</b>
+                                    <span>The devices trusted a <em>single</em> onboard RNG. One compiler flag (#ifndef) was enough to break seed security for four years with no visible error.</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="why-item">
+                                    <i class="bi bi-intersect"></i>
+                                    <b>NanoRandom mixes 2+ independent sources</b>
+                                    <span>Your seed is a hash of <em>your user salt</em> (browser CSPRNG) <em>plus</em> <em>live Nano blockhashes</em> (outside-world, verifiable entropy). Even if one source were flawed or influenced, the final entropy would still depend on the other.</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="why-item">
+                                    <i class="bi bi-eye"></i>
+                                    <b>Everything is public &amp; auditable</b>
+                                    <span>Blockhashes link straight to <a href="https://nanexplorer.com/nano/blocks/" target="_blank" rel="noopener">nanexplorer.com</a>. The full formula is written on this page. You don't have to trust a sealed chip — you can verify every step yourself.</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="why-item">
+                                    <i class="bi bi-person-lock"></i>
+                                    <b>Your salt is the secret part</b>
+                                    <span>As Coinkite's own advisory said, seeds were only safe when users added their own strong BIP39 passphrase / dice rolls. Same principle here: the blockhash is public, but <em>your salt is what makes your seed unguessable</em> to anyone else on the blockchain.</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="alert alert-dark why-tip">
+                            <i class="bi bi-shield-shaded"></i>
+                            The lesson of the Coldcard incident is: <b>never trust one RNG alone</b>.
+                            NanoRandom strips the "black box" of hardware: entropy comes from open, verifiable Live Nano blockhashes + your own secure-random salt, mixed with open public math.
+                        </div>
+                        <div class="why-references">
+                            <span class="text-muted small">Read more:</span>
+                            <a href="https://blog.coinkite.com/coldcard-mk3-seed-generation-warning/" target="_blank" rel="noopener" class="why-ref-link"><i class="bi bi-box-arrow-up-right"></i> Coinkite advisory (official)</a>
+                            <a href="https://github.com/nwfella/coldcard-entropy-incident/blob/main/README.md" target="_blank" rel="noopener" class="why-ref-link"><i class="bi bi-box-arrow-up-right"></i> Technical write-up</a>
+                            <a href="https://thehackernews.com/2026/08/coldcard-hardware-wallet-flaw-linked-to.html" target="_blank" rel="noopener" class="why-ref-link"><i class="bi bi-box-arrow-up-right"></i> The Hacker News coverage</a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FAQ -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <i class="bi bi-question-circle"></i> Frequently Asked Questions
+                    </div>
+                    <div class="card-body faq">
+                        <details open>
+                            <summary>1. What is a BIP39 mnemonic seed phrase?</summary>
+                            <p>BIP39 is the standard used by Nano, Bitcoin and many other cryptos to represent a private key as a list of human-readable words (12 / 15 / 18 / 24). The words come from a fixed dictionary of 2048 entries, so the phrase can be written down and retyped safely.</p>
+                        </details>
+                        <details>
+                            <summary>2. Where does the randomness come from?</summary>
+                            <p>Two sources are combined and SHA-256 hashed:</p>
+                            <ul>
+                                <li><b>User salt</b> &ndash; a secure random 128-bit value generated by your browser's <code>crypto.getRandomValues()</code> on page load. You can edit it or click <i class="bi bi-arrow-repeat"></i> to regenerate.</li>
+                                <li><b>Live Nano blockhashes</b> &ndash; fetched from <code>api.nanexplorer.com/last-blocks</code> every 3 seconds. The last 16 hashes are concatenated.</li>
+                            </ul>
+                            <p>Result: <code>entropy = SHA-256( salt + blockhashes )[0 : ENT/8]</code></p>
+                        </details>
+                        <details>
+                            <summary>3. Why mix blockhash with a user salt?</summary>
+                            <p>Blockhashes are public, so anyone can see them. A blockhash alone is <i>not</i> a private secret. The secure-random user salt (kept only in your browser) is the secret part that makes the entropy unpredictable to the outside world, while the live blockhash guarantees freshness and uniqueness on the Nano network.</p>
+                        </details>
+                        <details>
+                            <summary>4. Is this tool safe? Where is my seed stored?</summary>
+                            <p>Everything runs 100% client-side in your browser. No seed, salt or entropy is ever sent to any server. The only network call is to the public Nano explorer API to read live blockhashes. Still, before holding real funds, consider using a trusted offline/air-gapped device to sign transactions.</p>
+                        </details>
+                        <details>
+                            <summary>5. Why do 12 / 15 / 18 / 24 word options exist?</summary>
+                            <p>BIP39 requires the entropy length to be a multiple of 32 bits. The supported lengths are:</p>
+                            <ul>
+                                <li><b>12 words</b> &rarr; 128 bits entropy + 4-bit checksum</li>
+                                <li><b>15 words</b> &rarr; 160 bits entropy + 5-bit checksum</li>
+                                <li><b>18 words</b> &rarr; 192 bits entropy + 6-bit checksum</li>
+                                <li><b>24 words</b> &rarr; 256 bits entropy + 8-bit checksum</li>
+                            </ul>
+                        </details>
+                        <details>
+                            <summary>6. Can I reuse a salt later?</summary>
+                            <p>The salt is part of your entropy. If you regenerate the same salt (e.g. by saving it) combined with the same blockhash, you'd get the same seed. In practice the blockhash changes every few seconds, so each run is unique. If you want to back up a seed, use <b>Download</b> instead.</p>
+                        </details>
+                        <details>
+                            <summary>7. What happens if the API is down?</summary>
+                            <p>The badge switches to <span class="badge bg-danger">API Off</span>, the blockhash buffer stays as-is and the seed will not regenerate until the connection recovers (auto-retry on every poll). You can keep editing the salt to regenerate the seed from the existing buffer.</p>
+                        </details>
+                    </div>
+                </div>
+
+                <!-- Security tips -->
+                <div class="card mb-4">
+                    <div class="card-header"><i class="bi bi-exclamation-triangle"></i> Security tips</div>
+                    <div class="card-body">
+                        <ul class="mb-0 security-list">
+                            <li>Write down your seed phrase on paper and store it offline. Never store it in cloud notes or screenshots.</li>
+                            <li>Never share the seed or the user salt with anyone. Anyone with both can fully recover your wallet.</li>
+                            <li>For significant funds, prefer using an offline/air-gapped device and verify the seed derivation there before trusting any on-screen values.</li>
+                            <li>This tool is open and client-side &mdash; you can save the page and run it offline after the first load.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Toast -->
+            <div class="toast-container position-fixed bottom-0 end-0 p-3">
+                <div class="toast show" x-show="toast.show" x-transition>
+                    <div class="toast-header">
+                        <i class="bi bi-info-circle me-2"></i>
+                        <strong class="me-auto" x-text="toast.title"></strong>
+                        <button type="button" class="btn-close" @click="toast.show = false"></button>
+                    </div>
+                    <div class="toast-body" x-text="toast.body"></div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="footer py-4">
+            <div class="container">
+                <div class="row justify-content-center">
+                    <div class="col-md-10 col-lg-9 text-center">
+                        <p class="credit mb-3">
+                            <a href="https://github.com/dungvn3000/nanorandom" target="_blank" rel="noopener" class="credit-link">
+                                <i class="bi bi-github"></i> github.com/dungvn3000/nanorandom
+                            </a>
+                            <span class="mx-2 text-muted">|</span>
+                            Developed by <a href="https://tadu.cloud" target="_blank" rel="noopener" class="credit-link">tadu.cloud</a>
+                        </p>
+                        <div class="disclaimer">
+                            <i class="bi bi-shield-exclamation disclaimer-icon"></i>
+                            <b class="d-block mb-2">DISCLAIMER</b>
+                            <p>
+                                NanoRandom is an <b>educational &amp; experimental tool</b>. It is provided
+                                <b>"AS IS"</b>, without any warranty of any kind, express or implied,
+                                including but not limited to merchantability, fitness for a particular purpose,
+                                or non-infringement.
+                            </p>
+                            <p>
+                                <b>The authors and contributors are NOT responsible</b> for any lost funds,
+                                damaged wallets, leaked keys, or other damage arising from the use or misuse
+                                of this tool.
+                            </p>
+                            <p>
+                                This page runs <b>100% client-side</b>. Nothing is sent to any server except
+                                the public Nano explorer API used to poll live blockhashes. The randomness
+                                depends on your browser's <code>crypto.getRandomValues()</code> and a live
+                                blockhash feed.
+                            </p>
+                            <p>
+                                Never share your seed or user salt with anyone.
+                            </p>
+                            <p class="mt-2 text-muted">
+                                Generated seed phrases are for <b>testing and learning</b>.
+                                Use at your own risk.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" defer></script>
+    <!-- Alpine.js -->
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.2/dist/cdn.min.js" defer></script>
+    <!-- BIP39 wordlist + helpers -->
+    <script src="js/bip39.js"></script>
+    <!-- App -->
+    <script src="js/app.js"></script>
+</body>
+</html>
