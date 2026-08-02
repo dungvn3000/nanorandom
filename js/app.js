@@ -139,7 +139,8 @@ function seedApp() {
                 };
                 this.latestBlockTime = new Date().toLocaleTimeString();
 
-                this.scheduleGenerate();
+                // Auto-regenerate the system salt whenever fresh blockhashes arrive
+                this.regenSalt();
             } catch (e) {
                 console.error('[api] fetch error', e);
                 this.connected = false;
