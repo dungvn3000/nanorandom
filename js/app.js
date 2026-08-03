@@ -13,7 +13,8 @@ function seedApp() {
         // Generator state
         page: 'home',
         wordCount: 12,
-        systemSalt: '',
+        systemSalt: '',        // hex string, for UI display only
+        systemSaltBytes: [],   // the actual 32 raw bytes fed into SHA-256
         userSalt: '',
         generating: false,
         genTimer: null,
@@ -93,7 +94,8 @@ function seedApp() {
             }
             const arr = new Uint8Array(32);
             crypto.getRandomValues(arr);
-            this.systemSalt = BIP39.bytesToHex(Array.from(arr));
+            this.systemSaltBytes = Array.from(arr);              // raw bytes -> entropy
+            this.systemSalt = BIP39.bytesToHex(this.systemSaltBytes); // hex -> display only
             this.scheduleGenerate();
         },
 
@@ -204,23 +206,23 @@ function seedApp() {
             if (this._saltCacheKey !== key) {
                 this._saltCacheKey = key;
                 const out = [];
-                if (this.systemSalt) out.push(...Array.from(new TextEncoder().encode(this.systemSalt)));
-                if (this.userSalt)   out.push(...Array.from(new TextEncoder().encode(this.userSalt)));
+                // Feed the raw 32 bytes directly (no hex -> UTF-8 detour)
+                if (this.systemSaltBytes.length) out.push(...this.systemSaltBytes);
+                if (this.userSalt) out.push(...Array.from(new TextEncoder().encode(this.userSalt)));
                 this._saltCache = out;
             }
             return this._saltCache;
         },
 
-        // Build entropy bytes from blockhashes + system salt + user salt
+        // Build entropy bytes from system salt + user salt + blockhashes
         async blockHashEntropy(byteLen) {
             const combined = this.blockBuffer.join(''); // buffer already capped at 16
+            // Salts first (secret), then the public block bytes — matches the documented formula
+            const rawBytes = [...this._saltBytes()];
             // Convert hex chars to bytes
-            const rawBytes = [];
             for (let i = 0; i + 1 < combined.length; i += 2) {
                 rawBytes.push(parseInt(combined.slice(i, i + 2), 16));
             }
-            // Append system salt + user salt (UTF-8, cached)
-            rawBytes.push(...this._saltBytes());
             // SHA-256 to smooth distribution and produce 32 bytes
             let hashed = await BIP39.sha256(rawBytes);
             return hashed.slice(0, byteLen);
@@ -233,6 +235,11 @@ function seedApp() {
                 return;
             }
             if (this.blockBuffer.length === 0) return;
+            if (!this.systemSaltBytes.length) {
+                // Never build entropy without the CSPRNG system salt (fail closed)
+                this.showToast('No system salt', 'Secure random salt missing — no seed was generated.');
+                return;
+            }
 
             this.generating = true;
             try {
@@ -256,7 +263,7 @@ function seedApp() {
 
                 // Update derived display values (About tab only - skip if hidden)
                 if (this.page === 'about') {
-                    this.systemSaltHex = this.systemSalt ? BIP39.bytesToHex(this._saltBytes()) : '';
+                    this.systemSaltHex = this.systemSalt; // hex of the raw 32 bytes (user salt shown separately below)
                     const joined = this.blockBuffer.join('');
                     this.blockBufferHexShort = joined.length > 48 ? joined.slice(0, 48) + '...' : joined;
                     const csHash = await BIP39.sha256(entropyBytes);

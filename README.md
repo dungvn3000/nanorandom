@@ -38,18 +38,21 @@ The entropy is built from three independent sources and mixed via SHA-256. The
 with the auto-generated system salt and the optional user salt:
 
 ```
-entropy   = SHA-256( utf8(systemSalt) ++ utf8(userSalt) ++ hexBytes(last16Blockhashes) )[0 : ENT_bits/8]
+entropy   = SHA-256( rawSystemSaltBytes ++ utf8(userSalt) ++ blockhashBytes )[0 : ENT_bits/8]
 checksum  = SHA-256(entropy)[0 : ENT/32 bits]
 bits      = bin(entropy) ++ bin(checksum)
 mnemonic  = [ WORDLIST[bits[i:i+11]]  for i in 0,11,22,... ]
 ```
 
-- **systemSalt** &mdash; 256-bit CSPRNG from `crypto.getRandomValues()`, readonly,
-  regenerable anytime.
-- **userSalt** &mdash; optional text; the salt indicator warns if empty/too short.
-  Adds a second personal layer.
-- **last16Blockhashes** &mdash; public, verifiable entropy pulled live from the
-  Nano network.
+Input types:
+
+- **systemSalt** &mdash; 32 raw CSPRNG bytes from `crypto.getRandomValues()`
+  (the hex string shown in the UI is display-only; the raw bytes are what get
+  hashed). Readonly, regenerable anytime.
+- **userSalt** &mdash; optional text, encoded as UTF-8 bytes; the salt indicator
+  warns if empty/too short. Adds a second personal layer.
+- **blockhashes** &mdash; public, verifiable entropy pulled live from the Nano
+  network; each 64-hex-char hash is decoded to its raw 32-byte value.
 
 | Words | Entropy | Checksum | Total bits |
 |------:|--------:|---------:|-----------:|
