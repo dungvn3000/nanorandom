@@ -69,9 +69,22 @@ python3 -m http.server 8080   # http://localhost:8080
 
 ```
 nanorandom/
-├── index.html   # the whole app (markup + CSS + JS + BIP39 wordlist)
-└── README.md    # this file
+├── index.html    # BIP39 seed phrase generator (markup + CSS + JS + wordlist)
+├── password.html # independent CSPRNG password generator
+└── README.md     # this file
 ```
+
+## Password generator (`password.html`)
+
+Single-file password generator with an **independent CSPRNG** (not derived from any seed):
+
+- Every character is drawn with `crypto.getRandomValues()` via **rejection sampling** —
+  bytes in the modulo-bias zone are discarded and redrawn (no modulo bias)
+- Selectable charsets: upper / lower / numbers / symbols, length 8–128
+- Guarantees ≥ 1 character from each enabled set on unbiased slots
+- Honest strength estimate: `len × log2(charset pool)` — since characters are independent,
+  this is a real entropy figure, not a deterministic-derivation cap
+- Runs fully offline; fail closed when Web Crypto is unavailable
 
 ## Security notes
 
