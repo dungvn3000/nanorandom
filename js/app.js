@@ -300,7 +300,6 @@ function seedApp() {
                 '# NanoRandom Seed Phrase',
                 `# Generated: ${this.generatedAt}`,
                 `# Words: ${this.words.length}`,
-                `# Entropy: ${this.entropyHex}`,
                 `# Derivation: NanoRandom/Seed/v2`,
                 `# Inputs: browser CSPRNG + optional user salt + Nano blockhashes`,
                 '',
