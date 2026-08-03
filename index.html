@@ -60,6 +60,14 @@
         it offline. Anyone with these words owns the wallet.
     </p>
     <p class="note">
+        <b>Why mix live Nano blockhashes?</b> Browser CSPRNG is the secret anchor, but it
+        is a single point of failure &mdash; a buggy or mocked browser RNG alone would make
+        your seed fully reproducible. Folding public, timestamped block windows into the
+        hash means an attacker must also know <i>which window</i> your Generate drew from,
+        not just the RNG output. It adds zero theoretical entropy, but it stops one broken
+        RNG implementation from collapsing the seed.
+    </p>
+    <p class="note">
         <a href="https://github.com/dungvn3000/nanorandom#readme" target="_blank" rel="noopener"
            style="color:#58a6ff">How it works &mdash; read the full formula on GitHub (README)</a>
         &nbsp;·&nbsp;
