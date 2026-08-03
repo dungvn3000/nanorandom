@@ -55,6 +55,23 @@ capped at 16 per Generate.
 anchor is always the browser CSPRNG; user salt only adds protection when independently
 unpredictable.
 
+## Why Nano?
+
+Nano (XNO) is a feeless, eco-friendly cryptocurrency with a unique block-lattice
+architecture, which makes it particularly suited as a live auxiliary-entropy beacon:
+
+- **Blocks confirmed continuously** — Nano settles transactions in a steady stream with no
+  fees, so fresh blockhashes keep arriving around the clock; the "noise" of real user
+  transactions never runs out.
+- **256-bit blockhashes** — each Nano block has a 256-bit cryptographic block hash (Nano
+  uses the BLAKE2b-256 algorithm for block hashing, not SHA-256) that no one predicted
+  beforehand. It is public auxiliary input, never treated as a secret.
+- **Publicly verifiable** — the displayed hashes can be checked against an explorer
+  (nanexplorer.com). This app does not independently verify Nano consensus or confirmation
+  status; it only checks the hash *format*.
+- **Green & feeless** — no mining, no wasted energy, no cost per block. Pulling blockhashes
+  adds nothing to network load beyond normal API reads.
+
 ## Why live Nano blockhashes?
 
 The browser's Web Crypto CSPRNG is the primary secret entropy source — but it is also a
@@ -101,15 +118,18 @@ nanorandom/
 
 ## Password generator (`password.html`)
 
-Single-file password generator with an **independent CSPRNG** (not derived from any seed):
+Single-file password generator with two opt-in entropy modes:
 
-- Every character is drawn with `crypto.getRandomValues()` via **rejection sampling** —
-  bytes in the modulo-bias zone are discarded and redrawn (no modulo bias)
+- **Independent CSPRNG** (when you untick "Mix live Nano blockhashes") — characters drawn
+  straight from `crypto.getRandomValues()` via **rejection sampling** (no modulo bias)
+- **Mix live Nano blockhashes** *(enabled by default)* — characters drawn from a SHA-256
+  counter-mode stream seeded with a fresh 32-byte CSPRNG salt plus up to 16 validated live
+  blockhashes per Generate (`SHA-256( salt32 ++ blockBytes ++ counter )`). The password
+  depends on that fresh snapshot — it is not reproducible from any previous salt or block
+  set, and its displayed strength is capped at 256 bits (the stream salt)
 - Selectable charsets: upper / lower / numbers / symbols, length 8–128
 - Guarantees ≥ 1 character from each enabled set on unbiased slots
-- Honest strength estimate: `len × log2(charset pool)` — since characters are independent,
-  this is a real entropy figure, not a deterministic-derivation cap
-- Runs fully offline; fail closed when Web Crypto is unavailable
+- Runs fully offline in CSPRNG mode; fail closed when Web Crypto is unavailable
 
 ## Security notes
 
