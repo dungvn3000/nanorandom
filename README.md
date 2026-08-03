@@ -55,6 +55,31 @@ capped at 16 per Generate.
 anchor is always the browser CSPRNG; user salt only adds protection when independently
 unpredictable.
 
+## Why live Nano blockhashes?
+
+The browser's Web Crypto CSPRNG is the primary secret entropy source — but it is also a
+**single point of failure**: your seed depends on a specific implementation inside
+Chrome/Safari/Firefox, on a specific OS, with its own history of RNG bugs. Real-world
+precedent exists: a vendor's official advisory in July 2026 confirmed that a firmware
+integration error had routed seed generation to a weak software PRNG for years, silently.
+Reviewed cryptographic APIs still ship with bugs; "standard" is not a guarantee.
+
+Mixing **live Nano blockhashes** into the hash means a complete failure of the browser RNG
+no longer automatically exposes the seed: an attacker must additionally know *which public
+block window* your seed drew from and *when* you clicked Generate, and must recompute the
+same SHA-256 preimage to reproduce it. The blockhash cannot rescue a known seed (it is
+public auxiliary input, not a secret), and it adds **zero** bit to the theoretical
+security ceiling — but it breaks the dependency on one RNG implementation.
+
+Think of it as defense in depth, not as more entropy:
+
+- **Browser CSPRNG works** → blockhashes only add harmless freshness.
+- **Browser CSPRNG broken/bugged/mocked (for example by a malicious extension)** → the
+  public, timestamped block window is still outside the attacker's control at creation
+  time, so the seed does not collapse to being fully reproducible from the broken RNG.
+- **Never assume otherwise** → if your system is truly compromised, no public input saves
+  you; blockhash mixing is a *hardship multiplier*, not a shield.
+
 ## Run
 
 Open `index.html` directly in any modern browser — it works from `file://` (the `file:`
