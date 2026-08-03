@@ -10,7 +10,7 @@ own text) + **real-time blockhashes** from the Nano (XNO) network, then running
 everything through SHA-256 — entirely in your browser. It also derives strong
 random passwords from the same entropy.
 
-No backend. No tracking. No data ever leaves your machine.
+No backend. No tracking. Seed derivation runs locally — secrets are never intentionally transmitted.
 
 ---
 
@@ -29,7 +29,7 @@ No backend. No tracking. No data ever leaves your machine.
 - **Copy / Download** — copy to clipboard or save seed as a `.txt` file
 - **About / FAQ page** — explains the formula, entropy sources, security
   model and common questions
-- **100% client-side** — runs in any modern browser, can be saved and run offline
+- **Local derivation** — seed computed in your browser; the page can be saved and run offline
 
 ## How it works
 
@@ -138,8 +138,9 @@ docker stop nanorandom && docker rm nanorandom
 
 ## Security notes
 
-- The seed and both salts never leave your browser — the only network call
-  is to the public Nano Explorer API to read live blockhashes.
+- Seed, entropy and user-entered text are never intentionally transmitted —
+  network requests are limited to static web assets (CDN) and the public
+  Nano Explorer API used to read live blockhashes.
 - Blockhashes are public, so the **system salt** (256-bit CSPRNG) is the secret
   anchor that keeps each seed private; the **user salt** adds a second layer
   if you want extra unpredictability.
@@ -157,9 +158,10 @@ to merchantability, fitness for a particular purpose, or non-infringement.
 wallets, leaked keys, or other damage arising from the use or misuse of this
 tool.
 
-This page runs **100% client-side**. Nothing is sent to any server except the
-public Nano explorer API used to poll live blockhashes. The randomness depends
-on your browser's `crypto.getRandomValues()` and the live blockhash feed.
+Seed derivation runs **locally**. Seed, entropy and user-entered text are not
+intentionally transmitted by the application; the page still downloads web
+assets and fetches public blockhash data over the network. The randomness
+depends on your browser's `crypto.getRandomValues()` and the live blockhash feed.
 
 Before storing real funds, **always verify your seed in at least 2 independent
 offline tools** and ideally offline. **Never share your seed or the

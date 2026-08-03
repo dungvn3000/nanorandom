@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NanoRandom — Client-side BIP39 Seed Phrase Generator from Live Nano Blockhashes</title>
-      <meta name="description" content="NanoRandom generates BIP39 seed phrases (12/15/18/24 words) and strong passwords by combining an auto system salt + optional user salt + real-time blockhashes from the Nano (XNO) network. 100% client-side, no tracking.">
+      <meta name="description" content="NanoRandom generates BIP39 seed phrases (12/15/18/24 words) and strong passwords by combining an auto system salt + optional user salt + real-time blockhashes from the Nano (XNO) network. Seed derivation runs locally; no tracking.">
     <meta name="keywords" content="nano,random,seed phrase,mnemonic,bip39,xno,blockhash,entropy,crypto,nanexplorer,client-side,wallet generator">
     <meta name="author" content="nanorandom.dev">
     <meta name="robots" content="index, follow, max-image-preview:large">
@@ -18,7 +18,7 @@
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://nanorandom.dev/">
     <meta property="og:title" content="NanoRandom — BIP39 Seed Generator from Live Nano Blockhashes">
-    <meta property="og:description" content="Combined entropy from your local CSPRNG + live Nano blockhashes. 100% client-side, auditable, simple.">
+    <meta property="og:description" content="Combined entropy from your local CSPRNG + live Nano blockhashes. Seed derivation runs locally; auditable, simple.">
     <meta property="og:image" content="https://nanorandom.dev/og-image.png">
     <meta property="og:site_name" content="NanoRandom">
     <meta property="og:locale" content="en_US">
@@ -27,7 +27,7 @@
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:url" content="https://nanorandom.dev/">
     <meta name="twitter:title" content="NanoRandom — BIP39 Seed Generator from Live Nano Blockhashes">
-    <meta name="twitter:description" content="Generate auditable BIP39 mnemonics by combining your browser's CSPRNG with live Nano blockhashes. 100% client-side.">
+    <meta name="twitter:description" content="Generate auditable BIP39 mnemonics by combining your browser's CSPRNG with live Nano blockhashes. Derivation runs locally.">
     <meta name="twitter:image" content="https://nanorandom.dev/og-image.png">
 
     <!-- Structured data -->
@@ -387,7 +387,7 @@ mnemonic = [ WORDLIST[bits[i:i+11]]  for i in 0,11,22,... ]</pre>
                                 <div class="why-item">
                                     <i class="bi bi-fingerprint"></i>
                                     <b>256-bit blockhashes</b>
-                                    <span>Each confirmation produces a 256-bit SHA-256-family hash that no one predicted beforehand. It is a public, verifiable source of high entropy bits.</span>
+                                    <span>Each Nano block has a 256-bit cryptographic block hash that no one predicted beforehand. The hash is public auxiliary input and is not treated as a secret.</span>
                                 </div>
                             </div>
                             <div class="col-md-6">
@@ -395,8 +395,8 @@ mnemonic = [ WORDLIST[bits[i:i+11]]  for i in 0,11,22,... ]</pre>
                                     <i class="bi bi-check-circle-fill"></i>
                                     <b>Publicly verifiable</b>
                                     <span>Any hash you see in this app links straight to
-                                        <a href="https://nanexplorer.com/nano/blocks/" target="_blank" rel="noopener">nanexplorer.com</a>
-                                        so anyone can audit that the entropy actually came from a confirmed Nano block &mdash; transparency without hiding anything.</span>
+                                        <a href="https://nanexplorer.com/nano/blocks/" target="_blank" rel="noopener">nanexplorer.com</a>.
+                                        The displayed hash can be checked against an explorer, but this application does not independently verify Nano consensus or confirmation status.</span>
                                 </div>
                             </div>
                             <div class="col-md-6">
@@ -417,54 +417,59 @@ mnemonic = [ WORDLIST[bits[i:i+11]]  for i in 0,11,22,... ]</pre>
                 <!-- Why NanoRandom / Coldcard lesson -->
                 <div class="card mb-4">
                     <div class="card-header">
-                        <i class="bi bi-bug"></i> Why NanoRandom? &mdash; The Coldcard 2026 Lesson
+                        <i class="bi bi-bug"></i> Why NanoRandom? &mdash; Lessons from the 2026 Coldcard RNG flaw
                     </div>
                     <div class="card-body">
                         <p class="why-lead">
-                            In <strong>July 2026</strong> a single hidden firmware bug in a famous hardware wallet
-                            <em>silently replaced its hardware TRNG with a non-cryptographic PRNG for years</em>.
-                            On July 30, 2026 an attacker recreated the weak seeds offline and drained about
-                            <strong>594 BTC (~ $38M)</strong> from vulnerable wallets.
+                            In <strong>July 2026</strong>, Coinkite's official advisory disclosed that a firmware
+                            integration error had routed Coldcard seed generation to a <em>deterministic software
+                            PRNG instead of the hardware RNG</em> since March 2021 (effective entropy ≈ 40 bits
+                            on Mk3, ≈ 72 bits on Mk4/Mk5/Q, versus the expected 128).
+                            On July 30, 2026, Galaxy Research mapped a sweep of <strong>1,196 addresses and
+                            1,082.65 BTC (~ $70.2M) in 41 minutes</strong> and linked the pattern to this flaw
+                            (<em>suspected</em>, based on on-chain analysis &mdash; later suspected waves raised
+                            the estimate to ~ 1,367 BTC).
                         </p>
                         <div class="row g-3 mb-3">
                             <div class="col-md-6">
                                 <div class="why-item">
                                     <i class="bi bi-exclamation-octagon"></i>
                                     <b>Single point of failure</b>
-                                    <span>The devices trusted a <em>single</em> onboard RNG. One compiler flag (#ifndef) was enough to break seed security for four years with no visible error.</span>
+                                    <span>The devices trusted a <em>single</em> onboard RNG. A macro check (<code>#ifdef</code> vs value check) silently bound seed generation to a fallback PRNG seeded from the chip UID and timer registers &mdash; for four years, with no visible error.</span>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="why-item">
                                     <i class="bi bi-intersect"></i>
                                     <b>NanoRandom mixes 2+ independent sources</b>
-                                    <span>Your seed is a hash of <em>auto system salt</em> (browser CSPRNG) + <em>optional user salt</em> (your text) + <em>live Nano blockhashes</em> (verifiable, outside world). Even if any one source is compromised, the final entropy still depends on the remaining ones.</span>
+                                    <span>Your seed is a hash of <em>auto system salt</em> (browser CSPRNG) + <em>optional user salt</em> (your text) + <em>live Nano blockhashes</em> (verifiable, outside world). The browser CSPRNG is the primary secret entropy source; Nano blockhashes are public auxiliary input, and the optional user input only adds meaningful protection when it is independently unpredictable.</span>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="why-item">
                                     <i class="bi bi-eye"></i>
-                                    <b>Everything is public &amp; auditable</b>
-                                    <span>Blockhashes link straight to <a href="https://nanexplorer.com/nano/blocks/" target="_blank" rel="noopener">nanexplorer.com</a>. The full formula is written on this page. You don't have to trust a sealed chip — you can verify every step yourself.</span>
+                                    <b>Open code, open math</b>
+                                    <span>Blockhashes link straight to <a href="https://nanexplorer.com/nano/blocks/" target="_blank" rel="noopener">nanexplorer.com</a>. The full formula is written on this page, and the whole app is a single auditable HTML file you can save and run offline.</span>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="why-item">
                                     <i class="bi bi-person-lock"></i>
-                                    <b>Your salt is the secret part</b>
-                                    <span>As Coinkite's own advisory said, seeds were only safe when users added their own strong BIP39 passphrase / dice rolls. Same principle here: the blockhash is public, but <em>your salt is what makes your seed unguessable</em> to anyone else on the blockchain.</span>
+                                    <b>The browser random value is the secret part</b>
+                                    <span>As Coinkite's own advisory said, extra protection (dice / passphrase) only helps when it is unpredictable. Same principle here: the blockhash is public; <em>the browser-generated random value is the primary secret input, and a user-provided value adds protection only if it is high entropy and kept private</em>.</span>
                                 </div>
                             </div>
                         </div>
                         <div class="alert alert-dark why-tip">
                             <i class="bi bi-shield-shaded"></i>
-                            The lesson of the Coldcard incident is: <b>never trust one RNG alone</b>.
-                            NanoRandom strips the "black box" of hardware: entropy comes from open, verifiable Live Nano blockhashes + auto-generated system salt + optional user salt, mixed with open public math.
+                            The lesson is: <b>never trust one RNG alone</b>. Note also that an online JavaScript app
+                            still relies on its own trust chain &mdash; the hosting server, DNS/TLS, your browser
+                            and OS, browser extensions, CDN libraries and the explorer API. For significant funds,
+                            prefer a saved, offline copy of this page on a trusted device.
                         </div>
                         <div class="why-references">
                             <span class="text-muted small">Read more:</span>
                             <a href="https://blog.coinkite.com/coldcard-mk3-seed-generation-warning/" target="_blank" rel="noopener" class="why-ref-link"><i class="bi bi-box-arrow-up-right"></i> Coinkite advisory (official)</a>
-                            <a href="https://github.com/nwfella/coldcard-entropy-incident/blob/main/README.md" target="_blank" rel="noopener" class="why-ref-link"><i class="bi bi-box-arrow-up-right"></i> Technical write-up</a>
                             <a href="https://thehackernews.com/2026/08/coldcard-hardware-wallet-flaw-linked-to.html" target="_blank" rel="noopener" class="why-ref-link"><i class="bi bi-box-arrow-up-right"></i> The Hacker News coverage</a>
                         </div>
                     </div>
@@ -496,7 +501,7 @@ mnemonic = [ WORDLIST[bits[i:i+11]]  for i in 0,11,22,... ]</pre>
                         </details>
                         <details>
                             <summary>4. Is this tool safe? Where is my seed stored?</summary>
-                            <p>Everything runs 100% client-side in your browser. No seed, salt or entropy is ever sent to any server. The only network call is to the public Nano explorer API to read live blockhashes. Still, before holding real funds, consider using a trusted offline/air-gapped device to sign transactions.</p>
+                            <p>Seed derivation runs locally in your browser — no seed, salt, entropy or user-entered text is intentionally transmitted by the application. The page still downloads web assets (e.g. CDN libraries) and fetches public blockhash data over the network. Before holding real funds, consider using a trusted offline/air-gapped device to sign transactions.</p>
                         </details>
                         <details>
                             <summary>5. Why do 12 / 15 / 18 / 24 word options exist?</summary>
@@ -525,7 +530,7 @@ mnemonic = [ WORDLIST[bits[i:i+11]]  for i in 0,11,22,... ]</pre>
                     <div class="card-body">
                         <ul class="mb-0 security-list">
                             <li>Write down your seed phrase on paper and store it offline. Never store it in cloud notes or screenshots.</li>
-                            <li>Never share the seed or the salts (system + user) with anyone. Anyone with both salts + the matching blockhash window can fully recover your wallet.</li>
+                            <li>Never share the seed or the salts (system + user) with anyone. Anyone with both salts + the matching blockhash window AND the exact derivation details (version, hash order, block order, word count, encoding) can fully recover your wallet.</li>
                             <li>For significant funds, prefer using an offline/air-gapped device and verify the seed derivation there before trusting any on-screen values.</li>
                             <li>This tool is open and client-side &mdash; you can save the page and run it offline after the first load.</li>
                         </ul>
@@ -574,10 +579,10 @@ mnemonic = [ WORDLIST[bits[i:i+11]]  for i in 0,11,22,... ]</pre>
                                 of this tool.
                             </p>
                             <p>
-                                This page runs <b>100% client-side</b>. Nothing is sent to any server except
-                                the public Nano explorer API used to poll live blockhashes. The randomness
-                                depends on your browser's <code>crypto.getRandomValues()</code> and a live
-                                blockhash feed.
+                                <b>Seed derivation runs locally.</b> Seed, entropy and user-entered text are not
+                                intentionally transmitted by the application. The page still downloads web assets
+                                and fetches public blockhash data over the network. The randomness depends on
+                                your browser's <code>crypto.getRandomValues()</code> and a live blockhash feed.
                             </p>
                             <p>
                                 Never share your seed or the salts with anyone.

@@ -82,7 +82,7 @@ function seedApp() {
             if (!s.length)            { level='empty';  msg='Empty. System salt is auto-generated — enter your own text to add a personal layer to the entropy.'; cls='bg-warning'; }
             else if (s.length < 6)    { level='weak';   msg=`Too short (${s.length} chars). Easy to guess. Use at least 6 chars.`; cls='bg-danger'; }
             else if (s.length < 16)   { level='ok';     msg=`OK (${s.length} chars). Longer/ harder-to-guess is better.`; cls='bg-warning'; }
-            else                      { level='strong'; msg=`Strong (${s.length} chars). Nice.`; cls='bg-success'; }
+            else                      { level='strong'; msg=`Long (${s.length} chars) — but length alone is not entropy; only hard-to-guess text truly helps.`; cls='bg-warning'; }
             this.saltStatus = { level, msg, cls };
         },
 
