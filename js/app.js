@@ -16,6 +16,7 @@ function seedApp() {
         systemSalt: '',        // hex string, for UI display only
         systemSaltBytes: [],   // the actual 32 raw bytes fed into SHA-256
         userSalt: '',
+        showUserSalt: false,   // user salt field masked by default (type=password)
         generating: false,
         genTimer: null,
         words: [],

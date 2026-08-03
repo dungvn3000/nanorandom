@@ -134,7 +134,9 @@
                             <div class="col-md-3">
                                 <label class="form-label">System salt (auto)</label>
                                 <div class="input-group">
-                                    <input type="text" class="form-control mono" x-model="systemSalt" readonly title="Auto-generated 256-bit secure random. Not editable.">
+                                    <input type="text" class="form-control mono" x-model="systemSalt" readonly
+                                           title="Auto-generated 256-bit secure random. Not editable."
+                                           autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">
                                     <button class="btn btn-outline-primary" type="button" @click="regenSalt()" title="Regenerate secure random system salt">
                                         <i class="bi bi-arrow-repeat"></i>
                                     </button>
@@ -143,14 +145,21 @@
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label">User salt (your input) <span class="badge ms-1" :class="saltStatus.cls" x-text="saltStatus.level === 'strong' ? 'Strong' : saltStatus.level === 'ok' ? 'OK' : saltStatus.level === 'weak' ? 'Weak' : 'Empty'"></span></label>
-                                <input type="text" class="form-control mono" x-model="userSalt"
-                                    :class="{
-                                        'border-danger': saltStatus.level === 'empty' || saltStatus.level === 'weak',
-                                        'border-warning': saltStatus.level === 'ok',
-                                        'border-success': saltStatus.level === 'strong'
-                                    }"
-                                    placeholder="Enter your own text (leave empty if you just want the system salt)..."
-                                    @input="scheduleGenerate()">
+                                <div class="input-group">
+                                    <input :type="showUserSalt ? 'text' : 'password'" class="form-control mono" x-model="userSalt"
+                                        :class="{
+                                            'border-danger': saltStatus.level === 'empty' || saltStatus.level === 'weak',
+                                            'border-warning': saltStatus.level === 'ok',
+                                            'border-success': saltStatus.level === 'strong'
+                                        }"
+                                        placeholder="Enter your own text (leave empty if you just want the system salt)..."
+                                        autocomplete="new-password" autocapitalize="none" autocorrect="off" spellcheck="false"
+                                        @input="scheduleGenerate()">
+                                    <button class="btn btn-outline-secondary" type="button" @click="showUserSalt = !showUserSalt"
+                                            :title="showUserSalt ? 'Hide user salt' : 'Show user salt'">
+                                        <i class="bi" :class="showUserSalt ? 'bi-eye-slash' : 'bi-eye'"></i>
+                                    </button>
+                                </div>
                                 <div class="salt-indicator mt-2">
                                     <div class="salt-bar">
                                         <div class="salt-bar-fill" :class="saltStatus.cls" :style="saltStatus.level === 'strong' ? 'width:100%' : saltStatus.level === 'ok' ? 'width:55%' : saltStatus.level === 'weak' ? 'width:25%' : 'width:0%'"></div>
