@@ -681,3 +681,8 @@ body {
 .progress-bar {
     transition: width 0.3s ease;
 }
+
+/* Alpine.js x-cloak: hide uninitialized components until booted */
+[x-cloak] {
+    display: none !important;
+}
