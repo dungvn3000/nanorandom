@@ -44,7 +44,10 @@ function seedApp() {
 
         async init() {
             this.updateSaltStatus();
-            this.$watch('userSalt', () => this.updateSaltStatus());
+            this.$watch('userSalt', () => {
+                this.updateSaltStatus();
+                this.scheduleGenerate(); // user salt is part of the entropy -> regenerate the seed (debounced)
+            });
             // Warm up crypto subtle
             try {
                 await crypto.subtle.digest('SHA-256', new Uint8Array(1).buffer);
