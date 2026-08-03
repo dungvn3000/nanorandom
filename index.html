@@ -492,7 +492,7 @@ mnemonic = [ WORDLIST[bits[i:i+11]]  for i in 0,11,22,... ]</pre>
                     <div class="card-body faq">
                         <details open>
                             <summary>1. What is a BIP39 mnemonic seed phrase?</summary>
-                            <p>BIP39 is the standard used by Nano, Bitcoin and many other cryptos to represent a private key as a list of human-readable words (12 / 15 / 18 / 24). The words come from a fixed dictionary of 2048 entries, so the phrase can be written down and retyped safely.</p>
+                            <p>BIP39 encodes wallet entropy as a human-readable mnemonic (12 / 15 / 18 / 24 words from a fixed dictionary of 2048 entries, so the phrase can be written down and retyped safely). Wallet software then derives a binary seed and account keys from it according to wallet-specific derivation rules.</p>
                         </details>
                         <details>
                             <summary>2. Where does the randomness come from?</summary>
