@@ -81,14 +81,14 @@ function seedApp() {
             this.saltStatus = { level, msg, cls };
         },
 
-        // Generate a new secure random system salt (16 bytes -> 32 hex chars)
+        // Generate a new secure random system salt (32 bytes -> 64 hex chars)
         regenSalt() {
             // CSPRNG required: fail closed rather than falling back to a weak RNG
             if (typeof crypto === 'undefined' || !crypto.getRandomValues) {
                 this.showToast('Secure RNG unavailable', 'crypto.getRandomValues() is required — no seed was generated.');
                 return;
             }
-            const arr = new Uint8Array(16);
+            const arr = new Uint8Array(32);
             crypto.getRandomValues(arr);
             this.systemSalt = BIP39.bytesToHex(Array.from(arr));
             this.scheduleGenerate();

@@ -5,7 +5,7 @@
 Client-side BIP39 mnemonic seed & password generator powered by live Nano blockchain blockhashes.
 
 NanoRandom generates BIP39 seed phrases (12 / 15 / 18 / 24 words) by combining an
-auto-generated **system salt** (128-bit CSPRNG) + an optional **user salt** (your
+auto-generated **system salt** (256-bit CSPRNG) + an optional **user salt** (your
 own text) + **real-time blockhashes** from the Nano (XNO) network, then running
 everything through SHA-256 — entirely in your browser. It also derives strong
 random passwords from the same entropy.
@@ -17,7 +17,7 @@ No backend. No tracking. No data ever leaves your machine.
 ## Features
 
 - **Live Nano blockhashes** — polled every 3s from `api.nanexplorer.com/last-blocks`
-- **Auto system salt** — 128-bit CSPRNG from `crypto.getRandomValues()`, readonly,
+- **Auto system salt** — 256-bit CSPRNG from `crypto.getRandomValues()`, readonly,
   regenerable with one click
 - **Optional user salt** — you may type any text as a second, personal layer; the
   indicator warns if it's empty / very short
@@ -44,7 +44,7 @@ bits      = bin(entropy) ++ bin(checksum)
 mnemonic  = [ WORDLIST[bits[i:i+11]]  for i in 0,11,22,... ]
 ```
 
-- **systemSalt** &mdash; 128-bit CSPRNG from `crypto.getRandomValues()`, readonly,
+- **systemSalt** &mdash; 256-bit CSPRNG from `crypto.getRandomValues()`, readonly,
   regenerable anytime.
 - **userSalt** &mdash; optional text; the salt indicator warns if empty/too short.
   Adds a second personal layer.
@@ -136,7 +136,7 @@ docker stop nanorandom && docker rm nanorandom
 
 - The seed and both salts never leave your browser — the only network call
   is to the public Nano Explorer API to read live blockhashes.
-- Blockhashes are public, so the **system salt** (128-bit CSPRNG) is the secret
+- Blockhashes are public, so the **system salt** (256-bit CSPRNG) is the secret
   anchor that keeps each seed private; the **user salt** adds a second layer
   if you want extra unpredictability.
 - For holding real funds, consider an offline/air-gapped device and verify
