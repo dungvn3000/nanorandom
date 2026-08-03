@@ -272,7 +272,7 @@
                         </div>
 
                         <div class="text-muted small mt-3">
-                            <i class="bi bi-info-circle"></i> Password is derived by expanding the seed entropy (SHA-256 counter-mode stream over entropy+counter+salt), then mapping bytes to the chosen charset via rejection sampling (no modulo bias).
+                            <i class="bi bi-info-circle"></i> Password is deterministically derived from the generated entropy and the current salt snapshot (SHA-256 counter-mode stream, mapped to the charset via rejection sampling). It cannot be reproduced from the mnemonic alone unless all derivation inputs and options are preserved.
                         </div>
                     </div>
                 </div>
@@ -423,35 +423,38 @@ mnemonic = [ WORDLIST[bits[i:i+11]]  for i in 0,11,22,... ]</pre>
                     </div>
                 </div>
 
-                <!-- Why NanoRandom / Coldcard lesson -->
+                <!-- RNG lesson -->
                 <div class="card mb-4">
                     <div class="card-header">
-                        <i class="bi bi-bug"></i> Why NanoRandom? &mdash; Lessons from the 2026 Coldcard RNG flaw
+                        <i class="bi bi-bug"></i> Why NanoRandom? &mdash; The July 2026 Coldcard advisory, and what it does and does not tell us
                     </div>
                     <div class="card-body">
                         <p class="why-lead">
-                            In <strong>July 2026</strong>, Coinkite's official advisory disclosed that a firmware
-                            integration error had routed Coldcard seed generation to a <em>deterministic software
-                            PRNG instead of the hardware RNG</em> since March 2021 (effective entropy ≈ 40 bits
-                            on Mk3, ≈ 72 bits on Mk4/Mk5/Q, versus the expected 128).
-                            On July 30, 2026, Galaxy Research mapped a sweep of <strong>1,196 addresses and
-                            1,082.65 BTC (~ $70.2M) in 41 minutes</strong> and linked the pattern to this flaw
-                            (<em>suspected</em>, based on on-chain analysis &mdash; later suspected waves raised
-                            the estimate to ~ 1,367 BTC).
+                            <strong>Confirmed by the vendor's official advisory:</strong> in July 2026, Coinkite
+                            disclosed a firmware integration error that routed seed generation on affected Coldcard
+                            models to a <em>deterministic software PRNG instead of the hardware RNG</em>. The
+                            advisory published ≈ 72 bits of effective entropy (versus the expected 128) for
+                            Mk4/Mk5/Q and described the Mk2/Mk3 impact as more severe; fixed firmware was then
+                            released for every affected track, but updating does not repair an existing seed.
+                        </p>
+                        <p class="why-lead">
+                            <strong>Reported, not confirmed:</strong> news coverage and on-chain analysis associated
+                            large coin sweeps with this flaw. On-chain analysis indicates <em>suspicion</em>, not
+                            proof of causation for each address, so this page does not restate specific figures.
                         </p>
                         <div class="row g-3 mb-3">
                             <div class="col-md-6">
                                 <div class="why-item">
                                     <i class="bi bi-exclamation-octagon"></i>
-                                    <b>Single point of failure</b>
-                                    <span>The devices trusted a <em>single</em> onboard RNG. A macro check (<code>#ifdef</code> vs value check) silently bound seed generation to a fallback PRNG seeded from the chip UID and timer registers &mdash; for four years, with no visible error.</span>
+                                    <b>What is actually confirmed</b>
+                                    <span>A single wrong integration decision weakened seed randomness for years &mdash; silently, with no visible error. The vendor's mitigation guidance also confirms a general rule: extra entropy (dice rolls / a strong passphrase) only protects when it is <em>independently unpredictable</em>.</span>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="why-item">
                                     <i class="bi bi-intersect"></i>
-                                    <b>NanoRandom mixes 2+ independent sources</b>
-                                    <span>Your seed is a hash of <em>auto system salt</em> (browser CSPRNG) + <em>optional user salt</em> (your text) + <em>live Nano blockhashes</em> (verifiable, outside world). The browser CSPRNG is the primary secret entropy source; Nano blockhashes are public auxiliary input, and the optional user input only adds meaningful protection when it is independently unpredictable.</span>
+                                    <b>Mixing inputs is hygiene, not a guarantee</b>
+                                    <span>Your seed is hashed from the auto system salt (browser CSPRNG) + your optional user salt + public live Nano blockhashes. The <em>browser CSPRNG is the primary secret entropy source</em>; blockhashes are public auxiliary input, and user text only adds meaningful protection when it is independently unpredictable.</span>
                                 </div>
                             </div>
                             <div class="col-md-6">
@@ -465,21 +468,25 @@ mnemonic = [ WORDLIST[bits[i:i+11]]  for i in 0,11,22,... ]</pre>
                                 <div class="why-item">
                                     <i class="bi bi-person-lock"></i>
                                     <b>The browser random value is the secret part</b>
-                                    <span>As Coinkite's own advisory said, extra protection (dice / passphrase) only helps when it is unpredictable. Same principle here: the blockhash is public; <em>the browser-generated random value is the primary secret input, and a user-provided value adds protection only if it is high entropy and kept private</em>.</span>
+                                    <span>The blockhash is public; <em>the browser-generated random value is the primary secret input, and a user-provided value adds protection only if it is high entropy and kept private</em>.</span>
                                 </div>
                             </div>
                         </div>
                         <div class="alert alert-dark why-tip">
                             <i class="bi bi-shield-shaded"></i>
-                            The lesson is: <b>never trust one RNG alone</b>. Note also that an online JavaScript app
-                            still relies on its own trust chain &mdash; the hosting server, DNS/TLS, your browser
-                            and OS, browser extensions, CDN libraries and the explorer API. For significant funds,
-                            prefer a local, self-hosted copy (e.g. the bundled Docker setup) on a trusted device.
+                            Public reports have discussed failures caused by incorrect RNG integration in wallet
+                            software. Regardless of any individual incident, the general lesson is to use reviewed
+                            cryptographic APIs, fail closed when secure randomness is unavailable, publish test
+                            vectors, and avoid overstating protection from public auxiliary inputs. This incident
+                            is <b>not</b> cited as proof that this app is safe: an online JavaScript app still
+                            relies on the hosting server, DNS/TLS, your browser and OS, extensions, CDN libraries
+                            and the explorer API. For significant funds, prefer a local, self-hosted copy on a
+                            trusted device.
                         </div>
                         <div class="why-references">
-                            <span class="text-muted small">Read more:</span>
-                            <a href="https://blog.coinkite.com/coldcard-mk3-seed-generation-warning/" target="_blank" rel="noopener" class="why-ref-link"><i class="bi bi-box-arrow-up-right"></i> Coinkite advisory (official)</a>
-                            <a href="https://thehackernews.com/2026/08/coldcard-hardware-wallet-flaw-linked-to.html" target="_blank" rel="noopener" class="why-ref-link"><i class="bi bi-box-arrow-up-right"></i> The Hacker News coverage</a>
+                            <span class="text-muted small">Sources (accessed 2026-08-03):</span>
+                            <a href="https://blog.coinkite.com/coldcard-mk3-seed-generation-warning/" target="_blank" rel="noopener" class="why-ref-link"><i class="bi bi-box-arrow-up-right"></i> Coinkite advisory (official — confirmed by vendor)</a>
+                            <a href="https://thehackernews.com/2026/08/coldcard-hardware-wallet-flaw-linked-to.html" target="_blank" rel="noopener" class="why-ref-link"><i class="bi bi-box-arrow-up-right"></i> The Hacker News coverage (news report; includes unconfirmed on-chain analysis)</a>
                         </div>
                     </div>
                 </div>
