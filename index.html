@@ -82,13 +82,39 @@ function toBits(bytes) {
 }
 
 // BIP39: checksum = ENT/32 bits of SHA-256(entropy), then 11-bit word indices
+// BIP39 only allows entropy of 128, 160, 192, 224 or 256 bits
 async function entropyToMnemonic(entropyBytes) {
-    const csLen = (entropyBytes.length * 8) / 32;
+    if (!Array.isArray(entropyBytes) && !(entropyBytes instanceof Uint8Array)) {
+        throw new TypeError('Entropy must be a byte array');
+    }
+
+    const allowedLengths = new Set([16, 20, 24, 28, 32]);
+    if (!allowedLengths.has(entropyBytes.length)) {
+        throw new Error('Invalid BIP39 entropy length');
+    }
+
+    for (const byte of entropyBytes) {
+        if (!Number.isInteger(byte) || byte < 0 || byte > 255) {
+            throw new Error('Entropy contains an invalid byte');
+        }
+    }
+
+    if (WORDLIST.length !== 2048) {
+        throw new Error('Invalid BIP39 wordlist');
+    }
+
+    const checksumLength = entropyBytes.length / 4; // == (ENT*8)/32 in bits
     const hashBytes = await sha256(entropyBytes);
-    const allBits = toBits(entropyBytes) + toBits(hashBytes).slice(0, csLen);
+    const bits = toBits(Array.from(entropyBytes)) + toBits(hashBytes).slice(0, checksumLength);
+
     const words = [];
-    for (let i = 0; i + 11 <= allBits.length; i += 11) {
-        words.push(WORDLIST[parseInt(allBits.slice(i, i + 11), 2)]);
+    for (let i = 0; i < bits.length; i += 11) {
+        const index = parseInt(bits.slice(i, i + 11), 2);
+        const word = WORDLIST[index];
+        if (typeof word !== 'string') {
+            throw new Error('Wordlist index out of range');
+        }
+        words.push(word);
     }
     return words;
 }
