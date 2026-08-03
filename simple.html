@@ -20,6 +20,9 @@
     .ent { color: #8b949e; word-break: break-all; margin-top: 1em; font-size: .85em; }
     .note { color: #8b949e; font-size: .85em; margin-top: 1.4em; line-height: 1.6; }
     .err { color: #f85149; min-height: 1.2em; }
+    .mix { font-size: .85em; color: #8b949e; cursor: pointer; }
+    .mix input { accent-color: #1f6feb; }
+    .dim { color: #586069; font-size: .9em; }
 </style>
 </head>
 <body>
@@ -32,12 +35,16 @@
             <option value="24">24 words</option>
         </select>
         <button id="gen" type="button">Generate</button>
+        <label class="mix"><input type="checkbox" id="mixBlocks"> Mix live Nano blockhashes <span class="dim">(fetches from nanexplorer API &mdash; needs network)</span></label>
     </div>
+    <div class="ent" id="blocksInfo"></div>
     <div class="grid" id="grid"></div>
     <div class="ent">Entropy: <span id="ent">—</span></div>
     <p class="note">
-        One file, no network, no tracking &mdash; entropy comes only from your browser's Web Crypto
-        CSPRNG (the standard way wallets derive BIP39 seeds). Write the phrase down on paper and keep
+        One file, no tracking &mdash; by default entropy comes only from your browser's Web Crypto
+        CSPRNG (the standard way wallets derive BIP39 seeds), fully offline. With "Mix live Nano
+        blockhashes" enabled, a fresh random 32-byte salt is hashed together with up to 16 validated
+        live Nano blockhashes via SHA-256 per Generate. Write the phrase down on paper and keep
         it offline. Anyone with these words owns the wallet.
     </p>
     <p class="err" id="err" role="alert"></p>
@@ -71,13 +78,38 @@ async function entropyToMnemonic(entropyBytes) {
 }
 
 /* UI */
-const wcEl  = document.getElementById('wc');
-const grid  = document.getElementById('grid');
-const entEl = document.getElementById('ent');
-const errEl = document.getElementById('err');
+const wcEl      = document.getElementById('wc');
+const grid      = document.getElementById('grid');
+const entEl     = document.getElementById('ent');
+const errEl     = document.getElementById('err');
+const mixEl     = document.getElementById('mixBlocks');
+const blocksEl  = document.getElementById('blocksInfo');
+const genBtn    = document.getElementById('gen');
+
+// Fetch + validate live Nano blockhashes (same rules as the main app):
+// entry must be an object, hash = exactly 64 hex chars, dedupe, cap at 16.
+async function fetchBlockBytes(maxBlocks) {
+    const res = await fetch('https://api.nanexplorer.com/last-blocks?network=nano', { cache: 'no-store' });
+    if (!res.ok) throw new Error('Block API HTTP ' + res.status);
+    const data = await res.json();
+    if (!data || !Array.isArray(data.last)) throw new Error('Malformed payload shape: expected { last: [...] }');
+    const seen = new Set();
+    const bytes = [];
+    for (const b of data.last.slice(0, 64)) {
+        const h = (b && typeof b.hash === 'string') ? b.hash.trim().toUpperCase() : '';
+        if (!/^[0-9A-F]{64}$/.test(h) || seen.has(h)) continue;
+        seen.add(h);
+        for (let i = 0; i + 1 < 64; i += 2) bytes.push(parseInt(h.slice(i, i + 2), 16));
+        if (seen.size >= maxBlocks) break;
+    }
+    if (!seen.size) throw new Error('No valid blockhash in API response');
+    return { bytes, count: seen.size, hashes: Array.from(seen) };
+}
 
 async function generate() {
     errEl.textContent = '';
+    blocksEl.textContent = '';
+    genBtn.disabled = true;
     try {
         // Fail closed: never fall back to a weak RNG
         if (typeof crypto === 'undefined' || !crypto.getRandomValues || !crypto.subtle) {
@@ -86,9 +118,21 @@ async function generate() {
         const byteLen = { 12: 16, 15: 20, 18: 24, 24: 32 }[wcEl.value];
         if (!byteLen) throw new Error('Unsupported word count');
 
-        const arr = new Uint8Array(byteLen);
-        crypto.getRandomValues(arr);
-        const entropyBytes = Array.from(arr);
+        let entropyBytes;
+        if (mixEl.checked) {
+            // entropy = SHA-256( CSPRNG-salt(32B) ++ blockhashBytes )[0 : ENT/8]
+            const { bytes: blockBytes, count, hashes } = await fetchBlockBytes(16);
+            const saltArr = new Uint8Array(32);
+            crypto.getRandomValues(saltArr);
+            const input = Array.from(saltArr).concat(blockBytes);
+            entropyBytes = (await sha256(input)).slice(0, byteLen);
+            blocksEl.textContent = 'Blocks mixed: ' + count + '  ·  ' + hashes.map(h => h.slice(0, 8)).join(' ');
+        } else {
+            // Standard BIP39: direct CSPRNG bytes
+            const arr = new Uint8Array(byteLen);
+            crypto.getRandomValues(arr);
+            entropyBytes = Array.from(arr);
+        }
         const words = await entropyToMnemonic(entropyBytes);
         if (words.length !== Number(wcEl.value)) throw new Error('Unexpected mnemonic length');
         for (const w of words) {
@@ -111,6 +155,8 @@ async function generate() {
         grid.textContent = '';
         entEl.textContent = '—';
         errEl.textContent = e.message || 'Generation failed';
+    } finally {
+        genBtn.disabled = false;
     }
 }
 
