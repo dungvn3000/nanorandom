@@ -29,7 +29,7 @@
 </style>
 </head>
 <body>
-    <h1>Simple BIP39 Seed Generator</h1>
+    <h1>Simple BIP39 Seed Generator &mdash; base on Nano blockchain</h1>
     <div class="row">
         <select id="wc" aria-label="Word count">
             <option value="12" selected>12 words</option>
@@ -38,6 +38,7 @@
             <option value="24">24 words</option>
         </select>
         <button id="gen" type="button">Generate</button>
+        <button id="copyBtn" class="eyebtn" type="button">Copy</button>
         <label class="mix"><input type="checkbox" id="mixBlocks"> Mix live Nano blockhashes <span class="dim">(fetches from nanexplorer API &mdash; needs network)</span></label>
     </div>
     <div class="row">
@@ -99,6 +100,8 @@ const genBtn    = document.getElementById('gen');
 const userSaltEl = document.getElementById('userSalt');
 const saltEye   = document.getElementById('saltEye');
 const saltHint  = document.getElementById('saltHint');
+const copyBtn   = document.getElementById('copyBtn');
+let lastWords = []; // snapshot of the current seed for Copy
 
 // Same hint policy as the main app (length alone is NOT entropy)
 function updateSaltHint() {
@@ -185,6 +188,7 @@ async function generate() {
         }
 
         grid.textContent = ''; // reset (textContent only — never innerHTML)
+        lastWords = words;
         words.forEach((w, i) => {
             const cell = document.createElement('div');
             cell.className = 'word';
@@ -199,11 +203,26 @@ async function generate() {
     } catch (e) {
         grid.textContent = '';
         entEl.textContent = '—';
+        lastWords = [];
         errEl.textContent = e.message || 'Generation failed';
     } finally {
         genBtn.disabled = false;
     }
 }
+
+let copyReset = null;
+async function copySeed() {
+    if (!lastWords.length) { errEl.textContent = 'Generate a seed phrase first.'; return; }
+    try {
+        await navigator.clipboard.writeText(lastWords.join(' '));
+        copyBtn.textContent = 'Copied!';
+        clearTimeout(copyReset);
+        copyReset = setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1500);
+    } catch (e) {
+        errEl.textContent = 'Cannot copy: ' + e.message;
+    }
+}
+copyBtn.addEventListener('click', copySeed);
 
 document.getElementById('gen').addEventListener('click', generate);
     </script>
