@@ -41,6 +41,7 @@ function seedApp() {
         },
         password: '',
         pwBusy: false,
+        pwPending: false,
         pwStrength: { label: '-', cls: 'bg-secondary', percent: 0 },
 
         async init() {
@@ -272,8 +273,8 @@ function seedApp() {
 
                 this.words = words;
                 this.generatedAt = new Date().toLocaleString();
-                // Auto-generate password from the new entropy
-                this.genPassword();
+                // Auto-generate password from the NEW entropy snapshot (awaited -> always in sync)
+                await this.genPassword(this.entropyHex, this._saltBytes());
             } catch (e) {
                 console.error(e);
                 this.showToast('Error', e.message || 'Failed to generate seed.');
@@ -323,24 +324,14 @@ function seedApp() {
         },
 
         // ---- Password generator ----
-        // HKDF-like expansion: repeatedly SHA-256(entropyHex || counter || salts)
-        async expandEntropy(byteLen) {
-            const out = [];
-            const base = BIP39.hexToBytes(this.entropyHex || '00');
-            const saltBytes = Array.from(this._saltBytes());
-            let counter = 0;
-            while (out.length < byteLen) {
-                const input = base.concat([counter & 0xff], saltBytes);
-                const h = await BIP39.sha256(input);
-                out.push(...h);
-                counter++;
-            }
-            return out.slice(0, byteLen);
-        },
-
-        async genPassword() {
-            if (this.pwBusy) return;
-            if (!this.entropyHex) {
+        // Custom SHA-256 counter-mode expansion (NOT HKDF):
+        // stream block_i = SHA-256(entropyBytes || counter_i || saltBytes)
+        async genPassword(entropyHex, saltBytes) {
+            // Coalesce calls arriving while a generation is running (don't drop them)
+            if (this.pwBusy) { this.pwPending = true; return; }
+            const src    = entropyHex || this.entropyHex;         // snapshot, not live state
+            const salts  = saltBytes ? Array.from(saltBytes) : this._saltBytes();
+            if (!src) {
                 this.showToast('No entropy', 'Generate a seed phrase first.');
                 return;
             }
@@ -355,39 +346,60 @@ function seedApp() {
                     this.showToast('No charset', 'Select at least one character set.');
                     return;
                 }
-                const all = sets.join('');
-                const len = parseInt(this.pwOptions.length) || 64;
-                const expanded = await this.expandEntropy(len * 2);
+                const all  = sets.join('');
+                const len  = Math.min(128, Math.max(8, parseInt(this.pwOptions.length) || 64)); // clamp to UI spec 8..128
+                const base = BIP39.hexToBytes(src);
+
+                let counter = 0;
+                let buf = [];
+                const nextByte = async () => {
+                    if (!buf.length) {
+                        const h = await BIP39.sha256(base.concat([counter & 0xff], salts));
+                        buf.push(...h);
+                        counter++;
+                    }
+                    return buf.shift();
+                };
+                // Unbiased integer in [0, n) via rejection sampling (eliminates modulo bias).
+                // Multi-byte draw so n > 256 can never deadlock (limit would be 0).
+                const pick = async (n) => {
+                    const bytes = n <= 256 ? 1 : n <= 65536 ? 2 : 4;
+                    const range = 256 ** bytes;
+                    const limit = range - (range % n);
+                    let v;
+                    do {
+                        v = 0;
+                        for (let k = 0; k < bytes; k++) v = v * 256 + await nextByte();
+                    } while (v >= limit);
+                    return v % n;
+                };
+
                 const chars = [];
-                for (let i = 0; i < len; i++) {
-                    const idx = expanded[i] % all.length;
-                    chars.push(all[idx]);
-                }
+                for (let i = 0; i < len; i++) chars.push(all[await pick(all.length)]);
+
+                // Guarantee >= 1 char from each enabled set, on distinct unbiased slots
                 if (len >= sets.length) {
-                    // Pick `sets.length` distinct slots deterministically from expanded bytes
                     const used = new Set();
                     const slots = [];
-                    for (let raw = 0; raw < len * 2 && slots.length < sets.length; raw++) {
-                        const s = expanded[len + (raw % len)] % len;
-                        if (!used.has(s)) {
-                            used.add(s);
-                            slots.push(s);
-                        }
+                    let attempts = 0;
+                    while (slots.length < sets.length && attempts < len * 4 + 64) {
+                        attempts++;
+                        const s = await pick(len);
+                        if (!used.has(s)) { used.add(s); slots.push(s); }
                     }
-                    // Fallback: fill remaining slots with any un-used position
+                    // Fallback: fill remaining slots sequentially (stream can, in theory, be degenerate)
                     for (let p = 0; slots.length < sets.length && p < len; p++) {
                         if (!used.has(p)) { used.add(p); slots.push(p); }
                     }
-                    sets.forEach((set, i) => {
-                        const slot = slots[i];
-                        const ch = set[Math.floor((expanded[slot + len + i] || 0) % set.length)];
-                        chars[slot] = ch;
-                    });
+                    for (let i = 0; i < sets.length; i++) {
+                        chars[slots[i]] = sets[i][await pick(sets[i].length)];
+                    }
                 }
                 this.password = chars.join('');
                 this.updatePwStrength();
             } finally {
                 this.pwBusy = false;
+                if (this.pwPending) { this.pwPending = false; await this.genPassword(); }
             }
         },
 
@@ -404,14 +416,19 @@ function seedApp() {
         updatePwStrength() {
             const len = this.password.length;
             if (!len) { this.pwStrength = { label: '-', cls: 'bg-secondary', percent: 0 }; return; }
-            const sets = [];
-            if (/[A-Z]/.test(this.password)) sets.push(1);
-            if (/[a-z]/.test(this.password)) sets.push(1);
-            if (/[0-9]/.test(this.password)) sets.push(1);
-            if (/[^A-Za-z0-9]/.test(this.password)) sets.push(1);
-            const pool = 26 + 26 + 10 + 24;
-            const bits = len * Math.log2(pool) * (sets.length / 4);
-            const percent = Math.min(100, Math.round(bits / 1.28));
+            // Charset actually in effect (not the union of all sets)
+            let pool = 0;
+            if (this.pwOptions.upper)   pool += 26;
+            if (this.pwOptions.lower)   pool += 26;
+            if (this.pwOptions.numbers) pool += 10;
+            if (this.pwOptions.symbols) pool += 24;
+            if (!pool) { this.pwStrength = { label: '-', cls: 'bg-secondary', percent: 0 }; return; }
+            // The password is deterministic from the seed entropy, so its true
+            // unpredictability is capped by the seed bits feeding the expansion
+            const nominal  = len * Math.log2(pool);
+            const seedBits = this.entropyHex ? this.entropyHex.length * 4 : 0;
+            const bits     = Math.min(nominal, seedBits);
+            const percent  = Math.min(100, Math.round(bits / 1.28));
             let label, cls;
             if (bits < 60) { label = 'Weak';     cls = 'bg-danger'; }
             else if (bits < 100) { label = 'Fair';  cls = 'bg-warning'; }

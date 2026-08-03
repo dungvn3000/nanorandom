@@ -61,13 +61,14 @@ Input types:
 | 18    | 192 bit | 6 bit    | 198 bit    |
 | 24    | 256 bit | 8 bit    | 264 bit    |
 
-Passwords are derived by expanding the entropy with a SHA-256 counter chain
-and mapping bytes onto the chosen character set, ensuring at least one
-character from each enabled set is included.
+Passwords are derived by expanding the entropy with a SHA-256 counter-mode
+stream and mapping bytes onto the chosen character set via rejection sampling
+(no modulo bias), ensuring at least one character from each enabled set is
+included.
 
 ```
-expanded = SHA-256(entropy ++ counter ++ salt) chained until enough bytes
-password = map expanded[i] -> charset[ expanded[i] mod len(charset) ]
+stream block_i = SHA-256(entropy ++ counter_i ++ salt)   # counter-mode, on demand
+password[i]  = charset[ pick(stream) ]    # pick: reject bytes >= 256-(256 mod n), then byte mod n
 ```
 
 ## Tech stack

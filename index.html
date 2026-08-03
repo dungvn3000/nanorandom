@@ -263,7 +263,7 @@
                         </div>
 
                         <div class="text-muted small mt-3">
-                            <i class="bi bi-info-circle"></i> Password is derived by expanding the seed entropy (SHA-256 chain over entropy+salt+counter), then mapping bytes to the chosen charset.
+                            <i class="bi bi-info-circle"></i> Password is derived by expanding the seed entropy (SHA-256 counter-mode stream over entropy+counter+salt), then mapping bytes to the chosen charset via rejection sampling (no modulo bias).
                         </div>
                     </div>
                 </div>
