@@ -7,8 +7,8 @@ Client-side BIP39 mnemonic seed & password generator powered by live Nano blockc
 NanoRandom generates BIP39 seed phrases (12 / 15 / 18 / 24 words) by combining an
 auto-generated **system salt** (256-bit CSPRNG) + an optional **user salt** (your
 own text) + **real-time blockhashes** from the Nano (XNO) network, then running
-everything through SHA-256 — entirely in your browser. It also derives strong
-random passwords from the same entropy.
+everything through SHA-256 — entirely in your browser. It also deterministically
+derives passwords from the current entropy + salt snapshot.
 
 No backend. No tracking. Seed derivation runs locally — secrets are never intentionally transmitted.
 
@@ -20,7 +20,12 @@ No backend. No tracking. Seed derivation runs locally — secrets are never inte
 - **Auto system salt** — 256-bit CSPRNG from `crypto.getRandomValues()`, readonly,
   regenerable with one click
 - **Optional user salt** — you may type any text as a second, personal layer; the
-  indicator warns if it's empty / very short
+  indicator warns if it's empty / very short; the field is masked by default
+  (password-style input with a show/hide toggle, autofill + spell check disabled)
+- **Fail closed** — no CSPRNG or no system salt ⇒ no seed is generated; the
+  seed regenerates (debounced) whenever its inputs change
+- **Strict explorer validation** — every blockhash must be exactly 64 hex chars;
+  malformed payloads and oversized lists are rejected/truncated
 - **BIP39 compliant** — official 2048-word English wordlist, SHA-256 checksum
 - **Four word lengths** — 12 / 15 / 18 / 24 words (128 / 160 / 192 / 256 bits)
 - **Password generator** — derives passwords from the current entropy with
@@ -30,6 +35,7 @@ No backend. No tracking. Seed derivation runs locally — secrets are never inte
 - **About / FAQ page** — explains the formula, entropy sources, security
   model and common questions
 - **Local derivation** — seed computed in your browser (the live blockhash API is required at generation time); the page can be saved for offline auditing
+- **Pinned dependencies** — Bootstrap/Alpine loaded from CDN with SRI integrity hashes; UI hides behind `x-cloak` until booted
 
 ## How it works
 
@@ -94,7 +100,10 @@ nanorandom/
 ├── og-image.png      # Open Graph share image
 ├── robots.txt        # SEO
 ├── sitemap.xml       # SEO
-└── site.webmanifest  # PWA manifest
+├── site.webmanifest  # PWA manifest
+├── Dockerfile        # Container build (Caddy static server)
+├── Caddyfile         # gzip/zstd + security + cache headers
+└── LICENSE           # Apache License 2.0
 ```
 
 ## Run locally
