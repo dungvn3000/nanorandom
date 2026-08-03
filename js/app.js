@@ -300,7 +300,8 @@ function seedApp() {
                 `# Generated: ${this.generatedAt}`,
                 `# Words: ${this.words.length}`,
                 `# Entropy: ${this.entropyHex}`,
-                `# Source: 100% live blockhash from https://api.nanexplorer.com/last-blocks?network=nano`,
+                `# Derivation: NanoRandom/Seed/v2`,
+                `# Inputs: browser CSPRNG + optional user salt + Nano blockhashes`,
                 '',
                 this.words.join(' '),
                 ''
