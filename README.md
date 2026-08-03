@@ -29,7 +29,7 @@ No backend. No tracking. Seed derivation runs locally — secrets are never inte
 - **Copy / Download** — copy to clipboard or save seed as a `.txt` file
 - **About / FAQ page** — explains the formula, entropy sources, security
   model and common questions
-- **Local derivation** — seed computed in your browser; the page can be saved and run offline
+- **Local derivation** — seed computed in your browser (the live blockhash API is required at generation time); the page can be saved for offline auditing
 
 ## How it works
 

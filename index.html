@@ -458,7 +458,7 @@ mnemonic = [ WORDLIST[bits[i:i+11]]  for i in 0,11,22,... ]</pre>
                                 <div class="why-item">
                                     <i class="bi bi-eye"></i>
                                     <b>Open code, open math</b>
-                                    <span>Blockhashes link straight to <a href="https://nanexplorer.com/nano/blocks/" target="_blank" rel="noopener">nanexplorer.com</a>. The full formula is written on this page, and the whole app is a single auditable HTML file you can save and run offline.</span>
+                                    <span>Blockhashes link straight to <a href="https://nanexplorer.com/nano/blocks/" target="_blank" rel="noopener">nanexplorer.com</a>. The full formula is written on this page, and the whole app is a single auditable HTML file — easy to save and read the code offline. Generating seeds still requires the CDN libraries and the live blockhash API.</span>
                                 </div>
                             </div>
                             <div class="col-md-6">
@@ -474,7 +474,7 @@ mnemonic = [ WORDLIST[bits[i:i+11]]  for i in 0,11,22,... ]</pre>
                             The lesson is: <b>never trust one RNG alone</b>. Note also that an online JavaScript app
                             still relies on its own trust chain &mdash; the hosting server, DNS/TLS, your browser
                             and OS, browser extensions, CDN libraries and the explorer API. For significant funds,
-                            prefer a saved, offline copy of this page on a trusted device.
+                            prefer a local, self-hosted copy (e.g. the bundled Docker setup) on a trusted device.
                         </div>
                         <div class="why-references">
                             <span class="text-muted small">Read more:</span>
@@ -541,7 +541,7 @@ mnemonic = [ WORDLIST[bits[i:i+11]]  for i in 0,11,22,... ]</pre>
                             <li>Write down your seed phrase on paper and store it offline. Never store it in cloud notes or screenshots.</li>
                             <li>Never share the seed or the salts (system + user) with anyone. Anyone with both salts + the matching blockhash window AND the exact derivation details (version, hash order, block order, word count, encoding) can fully recover your wallet.</li>
                             <li>For significant funds, prefer using an offline/air-gapped device and verify the seed derivation there before trusting any on-screen values.</li>
-                            <li>This tool is open and client-side &mdash; you can save the page and run it offline after the first load.</li>
+                            <li>This tool is open-source &mdash; the page can be saved for offline code auditing. Generating seeds requires the CDN libraries and the live blockhash API.</li>
                         </ul>
                     </div>
                 </div>
