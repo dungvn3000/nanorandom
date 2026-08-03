@@ -1,630 +1,234 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NanoRandom — Client-side BIP39 Seed Phrase Generator from Live Nano Blockhashes</title>
-      <meta name="description" content="NanoRandom generates BIP39 seed phrases (12/15/18/24 words) and strong passwords by combining an auto system salt + optional user salt + real-time blockhashes from the Nano (XNO) network. Seed derivation runs locally; no tracking.">
-    <meta name="keywords" content="nano,random,seed phrase,mnemonic,bip39,xno,blockhash,entropy,crypto,nanexplorer,client-side,wallet generator">
-    <meta name="author" content="nanorandom.dev">
-    <meta name="robots" content="index, follow, max-image-preview:large">
-    <link rel="canonical" href="https://nanorandom.dev/">
-    <meta name="theme-color" content="#0d1117">
-    <link rel="icon" type="image/png" href="favicon.png">
-    <link rel="apple-touch-icon" href="favicon.png">
-    <link rel="manifest" href="site.webmanifest">
-
-    <!-- OpenGraph -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://nanorandom.dev/">
-    <meta property="og:title" content="NanoRandom — BIP39 Seed Generator from Live Nano Blockhashes">
-    <meta property="og:description" content="Combined entropy from your local CSPRNG + live Nano blockhashes. Seed derivation runs locally; auditable, simple.">
-    <meta property="og:image" content="https://nanorandom.dev/og-image.png">
-    <meta property="og:site_name" content="NanoRandom">
-    <meta property="og:locale" content="en_US">
-
-    <!-- Twitter card -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:url" content="https://nanorandom.dev/">
-    <meta name="twitter:title" content="NanoRandom — BIP39 Seed Generator from Live Nano Blockhashes">
-    <meta name="twitter:description" content="Generate auditable BIP39 mnemonics by combining your browser's CSPRNG with live Nano blockhashes. Derivation runs locally.">
-    <meta name="twitter:image" content="https://nanorandom.dev/og-image.png">
-
-    <!-- Structured data -->
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "WebApplication",
-      "name": "NanoRandom",
-      "url": "https://nanorandom.dev/",
-      "description": "Client-side BIP39 mnemonic seed phrase generator mixing auto system salt + user salt + live Nano (XNO) blockhashes.",
-      "applicationCategory": "UtilitiesApplication",
-      "operatingSystem": "Web",
-      "browserRequirements": "Requires a modern browser with Web Crypto API support.",
-      "isAccessibleForFree": true,
-      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
-      "creator": { "@type": "Organization", "name": "tadu.cloud", "url": "https://tadu.cloud" },
-      "inLanguage": "en-US",
-      "keywords": "BIP39, seed phrase, mnemonic, Nano, XNO, blockhash, entropy, crypto, wallet"
-    }
-    </script>
-
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"
-          integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN"
-          crossorigin="anonymous">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet"
-          integrity="sha384-4LISF5TTJX/fLmGSxO53rV4miRxdg84mZsxmO8Rx5jGtp/LbrixFETvWa5a6sESd"
-          crossorigin="anonymous">
-    <link href="css/style.css?v=mnvrorbz" rel="stylesheet">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Single-file, offline BIP39 mnemonic seed phrase generator using only the browser Web Crypto CSPRNG.">
+<title>NanoRandom — Simple BIP39 Generator</title>
+<style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body { background: #0d1117; color: #e6edf3; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; max-width: 720px; margin: 0 auto; padding: 2em 1em; }
+    h1 { font-size: 1.2rem; font-weight: 600; }
+    .row { display: flex; gap: .6em; align-items: center; flex-wrap: wrap; margin: 1em 0 1.2em; }
+    select, button { background: #161b22; color: #e6edf3; border: 1px solid #30363d; border-radius: 6px; padding: .5em .8em; font: inherit; }
+    button { background: #1f6feb; border-color: #1f6feb; cursor: pointer; }
+    button:hover { filter: brightness(1.15); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: .5em; margin-top: 1em; }
+    .word { background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: .5em .7em; }
+    .word b { color: #8b949e; margin-right: .5em; font-weight: normal; }
+    .ent { color: #8b949e; word-break: break-all; margin-top: 1em; font-size: .85em; }
+    .note { color: #8b949e; font-size: .85em; margin-top: 1.4em; line-height: 1.6; }
+    .err { color: #f85149; min-height: 1.2em; }
+    .mix { font-size: .85em; color: #8b949e; cursor: pointer; }
+    .mix input { accent-color: #1f6feb; }
+    .dim { color: #586069; font-size: .9em; }
+    .saltinput { flex: 1; min-width: 180px; background: #161b22; color: #e6edf3; border: 1px solid #30363d; border-radius: 6px; padding: .5em .8em; font: inherit; }
+    .eyebtn { background: #161b22; color: #8b949e; border: 1px solid #30363d; }
+    .eyebtn:hover { filter: brightness(1.2); }
+</style>
 </head>
 <body>
-    <div x-data="seedApp()" x-cloak>
-        <!-- Header -->
-        <nav class="navbar navbar-dark sticky-top shadow-sm">
-            <div class="container-fluid">
-                <span class="navbar-brand mb-0 h1">
-                    <i class="bi bi-shield-lock-fill"></i> NanoRandom
-                </span>
-                <div class="d-flex align-items-center gap-3">
-                    <div class="nav-pill-group">
-                        <button class="nav-pill" :class="page === 'home' ? 'active' : ''" @click="page = 'home'">
-                            <i class="bi bi-shuffle"></i> Generator
-                        </button>
-                        <button class="nav-pill" :class="page === 'about' ? 'active' : ''" @click="page = 'about'">
-                            <i class="bi bi-info-circle"></i> About
-                        </button>
-                    </div>
-                    <a href="https://github.com/dungvn3000/nanorandom" target="_blank" rel="noopener"
-                       class="gh-link" title="View source on GitHub">
-                        <i class="bi bi-github"></i>
-                    </a>
-                    <span class="badge ws-badge" :class="connected ? 'bg-success' : 'bg-danger'">
-                        <span class="dot" :class="connected ? 'dot-on' : 'dot-off'"></span>
-                        <span x-text="connected ? 'API Live' : 'API Off'"></span>
-                    </span>
-                </div>
-            </div>
-        </nav>
-
-        <main class="container py-4">
-            <!-- ================= HOME / GENERATOR ================= -->
-            <div x-show="page === 'home'">
-                <!-- Block info -->
-                <div class="card mb-4">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <span><i class="bi bi-blockchain-tip"></i> Block Lattice - Live Block</span>
-                        <span class="text-muted small" x-show="latestBlock.hash">Updated: <span x-text="latestBlockTime"></span></span>
-                    </div>
-                    <div class="card-body">
-                        <div class="row g-2">
-                            <div class="col-md-6">
-                                <div class="block-info">
-                                    <label>Block Hash</label>
-                                    <a :href="'https://nanexplorer.com/nano/blocks/' + latestBlock.hash" target="_blank" rel="noopener"
-                                       class="block-value mono block-link" x-text="latestBlock.hash || 'Awaiting block...'"></a>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="block-info">
-                                    <label>Account</label>
-                                    <a :href="'https://nanexplorer.com/nano/accounts/' + latestBlock.account" target="_blank" rel="noopener"
-                                       class="block-value mono block-link" x-text="latestBlock.account || '-'"></a>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="mt-2">
-                            <label class="text-muted small">Source: https://api.nanexplorer.com/last-blocks?network=nano</label>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Generator controls -->
-                <div class="card mb-4">
-                    <div class="card-body">
-                        <div class="row g-3 align-items-center">
-                            <div class="col-md-3">
-                                <label class="form-label">Word count</label>
-                                <select class="form-select" x-model="wordCount" @change="scheduleGenerate()">
-                                    <option value="12">12 words</option>
-                                    <option value="15">15 words</option>
-                                    <option value="18">18 words</option>
-                                    <option value="24">24 words</option>
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label">System salt (auto)</label>
-                                <div class="input-group">
-                                    <input type="text" class="form-control mono" x-model="systemSalt" readonly
-                                           title="Auto-generated 256-bit secure random. Not editable."
-                                           autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">
-                                    <button class="btn btn-outline-primary" type="button" @click="regenSalt()" title="Regenerate secure random system salt">
-                                        <i class="bi bi-arrow-repeat"></i>
-                                    </button>
-                                </div>
-                                <div class="form-text text-muted small">Auto-generated 256-bit CSPRNG.</div>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">User salt (your input) <span class="badge ms-1" :class="saltStatus.cls" x-text="saltStatus.level === 'strong' ? 'Strong' : saltStatus.level === 'ok' ? 'OK' : saltStatus.level === 'weak' ? 'Weak' : 'Empty'"></span></label>
-                                <div class="input-group">
-                                    <input :type="showUserSalt ? 'text' : 'password'" class="form-control mono" x-model="userSalt"
-                                        :class="{
-                                            'border-danger': saltStatus.level === 'empty' || saltStatus.level === 'weak',
-                                            'border-warning': saltStatus.level === 'ok',
-                                            'border-success': saltStatus.level === 'strong'
-                                        }"
-                                        placeholder="Enter your own text (leave empty if you just want the system salt)..."
-                                        autocomplete="new-password" autocapitalize="none" autocorrect="off" spellcheck="false"
-                                        @input="scheduleGenerate()">
-                                    <button class="btn btn-outline-secondary" type="button" @click="showUserSalt = !showUserSalt"
-                                            :title="showUserSalt ? 'Hide user salt' : 'Show user salt'">
-                                        <i class="bi" :class="showUserSalt ? 'bi-eye-slash' : 'bi-eye'"></i>
-                                    </button>
-                                </div>
-                                <div class="salt-indicator mt-2">
-                                    <div class="salt-bar">
-                                        <div class="salt-bar-fill" :class="saltStatus.cls" :style="saltStatus.level === 'strong' ? 'width:100%' : saltStatus.level === 'ok' ? 'width:55%' : saltStatus.level === 'weak' ? 'width:25%' : 'width:0%'"></div>
-                                    </div>
-                                    <div class="salt-msg small salt-msg-text" x-text="saltStatus.msg"></div>
-                                </div>
-                            </div>
-                            <div class="col-md-1 text-md-end">
-                                <span class="badge bg-secondary" x-show="blockCount !== null">
-                                    <i class="bi bi-broadcast"></i> Blocks: <span x-text="blockCount"></span>
-                                </span>
-                            </div>
-                        </div>
-                        <div class="form-text mt-2">
-                            <span class="text-info"><i class="bi bi-info-circle"></i> Entropy = SHA-256(rawSystemSaltBytes ++ utf8(userSalt) ++ blockhashBytes). System salt is 256-bit CSPRNG; user salt is optional but recommended for extra unpredictability.</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Seed phrase display -->
-                <div class="card mb-4" x-show="words.length">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <span><i class="bi bi-key"></i> Seed Phrase (<span x-text="words.length"></span> words)</span>
-                        <div class="btn-group btn-group-sm">
-                            <button class="btn btn-outline-secondary" @click="copy()">
-                                <i class="bi bi-clipboard"></i> Copy
-                            </button>
-                            <button class="btn btn-outline-secondary" @click="download()">
-                                <i class="bi bi-download"></i> Download
-                            </button>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <div class="seed-grid">
-                            <template x-for="(word, idx) in words" :key="idx">
-                                <div class="seed-item">
-                                    <span class="seed-num" x-text="idx + 1"></span>
-                                    <span class="seed-word" x-text="word"></span>
-                                </div>
-                            </template>
-                        </div>
-                    </div>
-                    <div class="card-footer text-muted small">
-                        <div class="row">
-                            <div class="col">Entropy: <span class="mono" x-text="entropyHex"></span></div>
-                            <div class="col text-end">Generated at: <span x-text="generatedAt"></span></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Password generator from entropy -->
-                <div class="card mb-4" x-show="words.length">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <span><i class="bi bi-keyboard"></i> Random Password from Entropy</span>
-                        <button class="btn btn-outline-secondary btn-sm" @click="copyPassword()" x-show="password">
-                            <i class="bi bi-clipboard"></i> Copy
-                        </button>
-                    </div>
-                    <div class="card-body">
-                        <div class="row g-3 mb-3">
-                            <div class="col-6 col-md-3">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="pwUpper" x-model="pwOptions.upper" @change="schedulePwGen()">
-                                    <label class="form-check-label" for="pwUpper">Uppercase <code>ABC</code></label>
-                                </div>
-                            </div>
-                            <div class="col-6 col-md-3">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="pwLower" x-model="pwOptions.lower" @change="schedulePwGen()">
-                                    <label class="form-check-label" for="pwLower">Lowercase <code>abc</code></label>
-                                </div>
-                            </div>
-                            <div class="col-6 col-md-3">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="pwNum" x-model="pwOptions.numbers" @change="schedulePwGen()">
-                                    <label class="form-check-label" for="pwNum">Numbers <code>123</code></label>
-                                </div>
-                            </div>
-                            <div class="col-6 col-md-3">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="pwSym" x-model="pwOptions.symbols" @change="schedulePwGen()">
-                                    <label class="form-check-label" for="pwSym">Symbols <code>!-;</code></label>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="row g-3 align-items-center">
-                            <div class="col-md-3">
-                                <label class="form-label">Length: <span class="badge bg-primary" x-text="pwOptions.length"></span></label>
-                            </div>
-                            <div class="col-md-9">
-                                <input type="range" class="form-range" min="8" max="128" step="1" x-model.number="pwOptions.length" @input="schedulePwGen()">
-                            </div>
-                        </div>
-
-                        <div class="password-box" x-show="password">
-                            <div class="password-text mono" x-text="password"></div>
-                        </div>
-
-                        <div class="password-strength mt-3" x-show="password">
-                            <div class="d-flex justify-content-between mb-1">
-                                <span class="small">Strength</span>
-                                <span class="badge" :class="pwStrength.cls" x-text="pwStrength.label"></span>
-                            </div>
-                            <div class="progress" style="height: 6px;">
-                                <div class="progress-bar" :class="pwStrength.cls" :style="'width:' + pwStrength.percent + '%'"></div>
-                            </div>
-                            <div class="text-muted small mt-1">
-                                <span x-text="pwStrength.percent"></span>% / ~<span x-text="Math.round((password.length * Math.log2(86)) / 1.28)"></span> bits entropy
-                            </div>
-                        </div>
-
-                        <div class="text-muted small mt-3">
-                            <i class="bi bi-info-circle"></i> Password is deterministically derived from the generated entropy and the current salt snapshot (SHA-256 counter-mode stream, mapped to the charset via rejection sampling). It cannot be reproduced from the mnemonic alone unless all derivation inputs and options are preserved.
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ================= ABOUT ================= -->
-            <div x-show="page === 'about'" x-transition>
-                <!-- How it works / formula -->
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <i class="bi bi-calculator"></i> How your seed is generated (BIP39)
-                    </div>
-                    <div class="card-body">
-                        <!-- Pipeline -->
-                        <div class="pipeline">
-                            <div class="pipe-step">
-                                <div class="pipe-title">1. System salt</div>
-                                <div class="pipe-value mono" x-text="systemSalt ? systemSalt.slice(0,8) + '...' : '-'"></div>
-                            </div>
-                            <div class="pipe-arrow">+</div>
-                            <div class="pipe-step">
-                                <div class="pipe-title">2. User salt</div>
-                                <div class="pipe-value mono" x-text="userSalt ? '&quot;' + userSalt + '&quot;' : '(empty)'"></div>
-                            </div>
-                            <div class="pipe-arrow">+</div>
-                            <div class="pipe-step">
-                                <div class="pipe-title">3. Live blockhash(es)</div>
-                                <div class="pipe-value mono" x-text="latestBlock.hash ? latestBlock.hash.slice(0,16) + '...' : '-'"></div>
-                            </div>
-                            <div class="pipe-arrow">&rarr;</div>
-                            <div class="pipe-step">
-                                <div class="pipe-title">4. Concatenate</div>
-                                <div class="pipe-value mono">salt + userSalt + hash bytes</div>
-                            </div>
-                            <div class="pipe-arrow">&rarr;</div>
-                            <div class="pipe-step">
-                                <div class="pipe-title">5. SHA-256</div>
-                                <div class="pipe-value mono">hash(x) = 32B</div>
-                            </div>
-                            <div class="pipe-arrow">&rarr;</div>
-                            <div class="pipe-step">
-                                <div class="pipe-title">6. Entropy</div>
-                                <div class="pipe-value mono" x-text="entropyHex ? entropyHex.slice(0,16) + '...' : '-'"></div>
-                            </div>
-                            <div class="pipe-arrow">&rarr;</div>
-                            <div class="pipe-step">
-                                <div class="pipe-title">7. BIP39 mnemonic</div>
-                                <div class="pipe-value mono" x-text="wordCount + ' words'"></div>
-                            </div>
-                        </div>
-
-                        <!-- Formula -->
-                        <div class="formula-box">
-                            <div class="formula-label">Formula</div>
-                            <pre class="formula">entropy = SHA-256( rawSystemSaltBytes ++ utf8(userSalt) ++ blockhashBytes )[0 : ENT_bits/8]
-
-<span class="text-muted"># systemSalt: 32 raw CSPRNG bytes | userSalt: UTF-8 bytes | blockhash: each 64-hex decoded to a 32-byte value</span>
-
-checksum = SHA-256(entropy)[0 : ENT/32 bits]   <span class="text-muted"># 4 / 5 / 6 / 8 bits</span>
-
-bits     = bin(entropy) ++ bin(checksum)       <span class="text-muted"># 132 / 165 / 198 / 264 bits</span>
-
-mnemonic = [ WORDLIST[bits[i:i+11]]  for i in 0,11,22,... ]</pre>
-                        </div>
-
-                        <!-- Live values -->
-                        <div class="row g-2 mt-2">
-                            <div class="col-md-6">
-                                <div class="block-info">
-                                    <label>systemSalt (hex of 32 raw bytes)</label>
-                                    <div class="block-value mono" x-text="systemSaltHex || '-'"></div>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="block-info">
-                                    <label>userSalt (raw)</label>
-                                    <div class="block-value mono" x-text="userSalt || '(empty)'"></div>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="block-info">
-                                    <label>blockhash buffer (last <span x-text="blockBuffer.length"></span> / 16 hashes, joined)</label>
-                                    <div class="block-value mono" x-text="blockBufferHexShort || '-'"></div>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="block-info">
-                                    <label>entropy (hex)</label>
-                                    <div class="block-value mono" x-text="entropyHex || '-'"></div>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="block-info">
-                                    <label>checksum (hex of SHA-256(entropy))</label>
-                                    <div class="block-value mono" x-text="checksumHex || '-'"></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Why Nano -->
-                <div class="card mb-4 why-nano-card">
-                    <div class="card-header">
-                        <i class="bi bi-lightning-charge"></i> Why Nano?
-                    </div>
-                    <div class="card-body">
-                        <p class="why-lead">
-                            <strong>Nano (XNO)</strong> is a feeless, eco-friendly cryptocurrency with a unique
-                            <em>block-lattice</em> architecture. It is perfectly suited as a live entropy source for this tool:
-                        </p>
-                        <div class="row g-3 mb-3">
-                            <div class="col-md-6">
-                                <div class="why-item">
-                                    <i class="bi bi-collection-fill"></i>
-                                    <b>Blocks confirmed continuously</b>
-                                    <span>Nano settles transactions &mdash; on average one or more per second, and free &mdash; so fresh blockhashes keep arriving 24/7. We never run out of new randomness.</span>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="why-item">
-                                    <i class="bi bi-fingerprint"></i>
-                                    <b>256-bit blockhashes</b>
-                                    <span>Each Nano block has a 256-bit cryptographic block hash that no one predicted beforehand. The hash is public auxiliary input and is not treated as a secret.</span>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="why-item">
-                                    <i class="bi bi-check-circle-fill"></i>
-                                    <b>Publicly verifiable</b>
-                                    <span>Any hash you see in this app links straight to
-                                        <a href="https://nanexplorer.com/nano/blocks/" target="_blank" rel="noopener">nanexplorer.com</a>.
-                                        The displayed hash can be checked against an explorer, but this application does not independently verify Nano consensus or confirmation status.</span>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="why-item">
-                                    <i class="bi bi-feather"></i>
-                                    <b>Green &amp; feeless</b>
-                                    <span>No mining, no wasted energy, no cost per block. The "noise" of real user transactions keeps the pipeline running without contributing to carbon or network congestion.</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="alert alert-dark why-tip">
-                            <i class="bi bi-shield-shaded"></i>
-                            But remember: <b>public blockhashes alone are not secret</b>. The <b>system salt</b> (256-bit, auto-generated client-side) keeps each seed private; the <b>user salt</b> you type adds a second, personal layer.
-                        </div>
-                    </div>
-                </div>
-
-                <!-- RNG lesson -->
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <i class="bi bi-bug"></i> Why NanoRandom? &mdash; The July 2026 Coldcard advisory, and what it does and does not tell us
-                    </div>
-                    <div class="card-body">
-                        <p class="why-lead">
-                            <strong>Confirmed by the vendor's official advisory:</strong> in July 2026, Coinkite
-                            disclosed a firmware integration error that routed seed generation on affected Coldcard
-                            models to a <em>deterministic software PRNG instead of the hardware RNG</em>. The
-                            advisory published ≈ 72 bits of effective entropy (versus the expected 128) for
-                            Mk4/Mk5/Q and described the Mk2/Mk3 impact as more severe; fixed firmware was then
-                            released for every affected track, but updating does not repair an existing seed.
-                        </p>
-                        <p class="why-lead">
-                            <strong>Reported, not confirmed:</strong> news coverage and on-chain analysis associated
-                            large coin sweeps with this flaw. On-chain analysis indicates <em>suspicion</em>, not
-                            proof of causation for each address, so this page does not restate specific figures.
-                        </p>
-                        <div class="row g-3 mb-3">
-                            <div class="col-md-6">
-                                <div class="why-item">
-                                    <i class="bi bi-exclamation-octagon"></i>
-                                    <b>What is actually confirmed</b>
-                                    <span>A single wrong integration decision weakened seed randomness for years &mdash; silently, with no visible error. The vendor's mitigation guidance also confirms a general rule: extra entropy (dice rolls / a strong passphrase) only protects when it is <em>independently unpredictable</em>.</span>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="why-item">
-                                    <i class="bi bi-intersect"></i>
-                                    <b>Mixing inputs is hygiene, not a guarantee</b>
-                                    <span>Your seed is hashed from the auto system salt (browser CSPRNG) + your optional user salt + public live Nano blockhashes. The <em>browser CSPRNG is the primary secret entropy source</em>; blockhashes are public auxiliary input, and user text only adds meaningful protection when it is independently unpredictable.</span>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="why-item">
-                                    <i class="bi bi-eye"></i>
-                                    <b>Open code, open math</b>
-                                    <span>Blockhashes link straight to <a href="https://nanexplorer.com/nano/blocks/" target="_blank" rel="noopener">nanexplorer.com</a>. The full formula is written on this page, and the whole app is a single auditable HTML file — easy to save and read the code offline. Generating seeds still requires the CDN libraries and the live blockhash API.</span>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="why-item">
-                                    <i class="bi bi-person-lock"></i>
-                                    <b>The browser random value is the secret part</b>
-                                    <span>The blockhash is public; <em>the browser-generated random value is the primary secret input, and a user-provided value adds protection only if it is high entropy and kept private</em>.</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="alert alert-dark why-tip">
-                            <i class="bi bi-shield-shaded"></i>
-                            Public reports have discussed failures caused by incorrect RNG integration in wallet
-                            software. Regardless of any individual incident, the general lesson is to use reviewed
-                            cryptographic APIs, fail closed when secure randomness is unavailable, publish test
-                            vectors, and avoid overstating protection from public auxiliary inputs. This incident
-                            is <b>not</b> cited as proof that this app is safe: an online JavaScript app still
-                            relies on the hosting server, DNS/TLS, your browser and OS, extensions, CDN libraries
-                            and the explorer API. For significant funds, prefer a local, self-hosted copy on a
-                            trusted device.
-                        </div>
-                        <div class="why-references">
-                            <span class="text-muted small">Sources (accessed 2026-08-03):</span>
-                            <a href="https://blog.coinkite.com/coldcard-mk3-seed-generation-warning/" target="_blank" rel="noopener" class="why-ref-link"><i class="bi bi-box-arrow-up-right"></i> Coinkite advisory (official — confirmed by vendor)</a>
-                            <a href="https://thehackernews.com/2026/08/coldcard-hardware-wallet-flaw-linked-to.html" target="_blank" rel="noopener" class="why-ref-link"><i class="bi bi-box-arrow-up-right"></i> The Hacker News coverage (news report; includes unconfirmed on-chain analysis)</a>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- FAQ -->
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <i class="bi bi-question-circle"></i> Frequently Asked Questions
-                    </div>
-                    <div class="card-body faq">
-                        <details open>
-                            <summary>1. What is a BIP39 mnemonic seed phrase?</summary>
-                            <p>BIP39 encodes wallet entropy as a human-readable mnemonic (12 / 15 / 18 / 24 words from a fixed dictionary of 2048 entries, so the phrase can be written down and retyped safely). Wallet software then derives a binary seed and account keys from it according to wallet-specific derivation rules.</p>
-                        </details>
-                        <details>
-                            <summary>2. Where does the randomness come from?</summary>
-                            <p>Three sources are combined and SHA-256 hashed:</p>
-                            <ul>
-                                <li><b>System salt</b> &ndash; 32 raw CSPRNG bytes from your browser's <code>crypto.getRandomValues()</code> on page load, fed to SHA-256 as-is (the hex string shown in the UI is display-only). Auto-generated, readonly, regenerable with <i class="bi bi-arrow-repeat"></i>.</li>
-                                <li><b>User salt</b> &ndash; optional text you type yourself, encoded as UTF-8 bytes. Leave empty unless you want a second, personal layer.</li>
-                                <li><b>Live Nano blockhashes</b> &ndash; fetched from <code>api.nanexplorer.com/last-blocks</code> every 3 seconds; up to the last 16 hashes (rolling buffer), each 64-hex value decoded to its raw 32-byte form.</li>
-                            </ul>
-                            <p>Result: <code>entropy = SHA-256( rawSystemSaltBytes ++ utf8(userSalt) ++ blockhashBytes )[0 : ENT/8]</code></p>
-                        </details>
-                        <details>
-                            <summary>3. Why mix blockhash with two salts?</summary>
-                            <p>Blockhashes are public. A blockhash alone is <i>not</i> a private secret. The system salt is auto-generated by your browser (so nobody can calculate it in advance), and the user salt adds a second layer that you control &mdash; if an attacker knew the blockhash(es) and guessed one of the salts, they still have to guess the other. On the Nano network, both salts stay local, never uploaded.</p>
-                        </details>
-                        <details>
-                            <summary>4. Is this tool safe? Where is my seed stored?</summary>
-                            <p>Seed derivation runs locally in your browser — no seed, salt, entropy or user-entered text is intentionally transmitted by the application. The page still downloads web assets (e.g. CDN libraries) and fetches public blockhash data over the network. Before holding real funds, consider using a trusted offline/air-gapped device to sign transactions.</p>
-                        </details>
-                        <details>
-                            <summary>5. Why do 12 / 15 / 18 / 24 word options exist?</summary>
-                            <p>BIP39 requires the entropy length to be a multiple of 32 bits. The supported lengths are:</p>
-                            <ul>
-                                <li><b>12 words</b> &rarr; 128 bits entropy + 4-bit checksum</li>
-                                <li><b>15 words</b> &rarr; 160 bits entropy + 5-bit checksum</li>
-                                <li><b>18 words</b> &rarr; 192 bits entropy + 6-bit checksum</li>
-                                <li><b>24 words</b> &rarr; 256 bits entropy + 8-bit checksum</li>
-                            </ul>
-                        </details>
-                        <details>
-                            <summary>6. Can I reuse a salt later?</summary>
-                            <p>The salt is part of your entropy. If you regenerate the same salt (e.g. by saving it) combined with the same blockhash, you'd get the same seed. In practice the blockhash changes every few seconds, so each run is unique. If you want to back up a seed, use <b>Download</b> instead.</p>
-                        </details>
-                        <details>
-                            <summary>7. What happens if the API is down?</summary>
-                            <p>The badge switches to <span class="badge bg-danger">API Off</span>, the blockhash buffer stays as-is and the seed will not regenerate until the connection recovers (auto-retry on every poll). You can keep editing the salt to regenerate the seed from the existing buffer.</p>
-                        </details>
-                    </div>
-                </div>
-
-                <!-- Security tips -->
-                <div class="card mb-4">
-                    <div class="card-header"><i class="bi bi-exclamation-triangle"></i> Security tips</div>
-                    <div class="card-body">
-                        <ul class="mb-0 security-list">
-                            <li>Write down your seed phrase on paper and store it offline. Never store it in cloud notes or screenshots.</li>
-                            <li>Never share the seed or the salts (system + user) with anyone. Anyone with both salts + the matching blockhash window AND the exact derivation details (version, hash order, block order, word count, encoding) can fully recover your wallet.</li>
-                            <li>For significant funds, prefer using an offline/air-gapped device and verify the seed derivation there before trusting any on-screen values.</li>
-                            <li>This tool is open-source &mdash; the page can be saved for offline code auditing. Generating seeds requires the CDN libraries and the live blockhash API.</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Toast -->
-            <div class="toast-container position-fixed bottom-0 end-0 p-3">
-                <div class="toast show" x-show="toast.show" x-transition>
-                    <div class="toast-header">
-                        <i class="bi bi-info-circle me-2"></i>
-                        <strong class="me-auto" x-text="toast.title"></strong>
-                        <button type="button" class="btn-close" @click="toast.show = false"></button>
-                    </div>
-                    <div class="toast-body" x-text="toast.body"></div>
-                </div>
-            </div>
-        </main>
-
-        <footer class="footer py-4">
-            <div class="container">
-                <div class="row justify-content-center">
-                    <div class="col-md-10 col-lg-9 text-center">
-                        <p class="credit mb-3">
-                            <a href="https://github.com/dungvn3000/nanorandom" target="_blank" rel="noopener" class="credit-link">
-                                <i class="bi bi-github"></i> github.com/dungvn3000/nanorandom
-                            </a>
-                            <span class="mx-2 text-muted">|</span>
-                            Developed by <a href="https://tadu.cloud" target="_blank" rel="noopener" class="credit-link">tadu.cloud</a>
-                            <span class="mx-2 text-muted">|</span>
-                            Base on <a href="https://nano.org" target="_blank" rel="noopener" class="credit-link">Nano blockchain</a>
-                        </p>
-                        <div class="disclaimer">
-                            <i class="bi bi-shield-exclamation disclaimer-icon"></i>
-                            <b class="d-block mb-2">DISCLAIMER</b>
-                            <p>
-                                NanoRandom is an <b>educational &amp; experimental tool</b>. It is provided
-                                <b>"AS IS"</b>, without any warranty of any kind, express or implied,
-                                including but not limited to merchantability, fitness for a particular purpose,
-                                or non-infringement.
-                            </p>
-                            <p>
-                                <b>The authors and contributors are NOT responsible</b> for any lost funds,
-                                damaged wallets, leaked keys, or other damage arising from the use or misuse
-                                of this tool.
-                            </p>
-                            <p>
-                                <b>Seed derivation runs locally.</b> Seed, entropy and user-entered text are not
-                                intentionally transmitted by the application. The page still downloads web assets
-                                and fetches public blockhash data over the network. The randomness depends on
-                                your browser's <code>crypto.getRandomValues()</code> and a live blockhash feed.
-                            </p>
-                            <p>
-                                Never share your seed or the salts with anyone.
-                            </p>
-                            <p class="mt-2 text-muted">
-                                Generated seed phrases are for <b>testing and learning</b>.
-                                Use at your own risk.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </footer>
+    <h1>Simple BIP39 Seed Generator &mdash; base on Nano blockchain</h1>
+    <div class="row">
+        <select id="wc" aria-label="Word count">
+            <option value="12" selected>12 words</option>
+            <option value="15">15 words</option>
+            <option value="18">18 words</option>
+            <option value="24">24 words</option>
+        </select>
+        <button id="gen" type="button">Generate</button>
+        <button id="copyBtn" class="eyebtn" type="button">Copy</button>
+        <label class="mix"><input type="checkbox" id="mixBlocks" checked> Mix live Nano blockhashes <span class="dim">(fetches from nanexplorer API &mdash; needs network)</span></label>
     </div>
+    <div class="row">
+        <label class="dim" for="userSalt">User salt</label>
+        <input class="saltinput" id="userSalt" type="password" placeholder="optional &mdash; your own text"
+               autocomplete="new-password" autocapitalize="none" autocorrect="off" spellcheck="false">
+        <button id="saltEye" class="eyebtn" type="button" title="Show user salt">Show</button>
+        <span class="dim" id="saltHint"></span>
+    </div>
+    <div class="ent" id="blocksInfo"></div>
+    <div class="grid" id="grid"></div>
+    <div class="ent">Entropy: <span id="ent">—</span></div>
+    <p class="note">
+        One file, no tracking &mdash; by default entropy comes only from your browser's Web Crypto
+        CSPRNG (the standard way wallets derive BIP39 seeds), fully offline. With "Mix live Nano
+        blockhashes" and/or a user salt, a fresh random 32-byte salt is hashed together with your
+        UTF-8 salt text and up to 16 validated live Nano blockhashes via SHA-256 per Generate
+        (Salt ++ User salt ++ Blockhashes). Write the phrase down on paper and keep
+        it offline. Anyone with these words owns the wallet.
+    </p>
+    <p class="note">
+        <a href="https://github.com/dungvn3000/nanorandom#readme" target="_blank" rel="noopener"
+           style="color:#58a6ff">How it works &mdash; read the full formula on GitHub (README)</a>
+    </p>
+    <p class="err" id="err" role="alert"></p>
+    <script>
+const WORDLIST = ["abandon","ability","able","about","above","absent","absorb","abstract","absurd","abuse","access","accident","account","accuse","achieve","acid","acoustic","acquire","across","act","action","actor","actress","actual","adapt","add","addict","address","adjust","admit","adult","advance","advice","aerobic","affair","afford","afraid","again","age","agent","agree","ahead","aim","air","airport","aisle","alarm","album","alcohol","alert","alien","all","alley","allow","almost","alone","alpha","already","also","alter","always","amateur","amazing","among","amount","amused","analyst","anchor","ancient","anger","angle","angry","animal","ankle","announce","annual","another","answer","antenna","antique","anxiety","any","apart","apology","appear","apple","approve","april","arch","arctic","area","arena","argue","arm","armed","armor","army","around","arrange","arrest","arrive","arrow","art","artefact","artist","artwork","ask","aspect","assault","asset","assist","assume","asthma","athlete","atom","attack","attend","attitude","attract","auction","audit","august","aunt","author","auto","autumn","average","avocado","avoid","awake","aware","away","awesome","awful","awkward","axis","baby","bachelor","bacon","badge","bag","balance","balcony","ball","bamboo","banana","banner","bar","barely","bargain","barrel","base","basic","basket","battle","beach","bean","beauty","because","become","beef","before","begin","behave","behind","believe","below","belt","bench","benefit","best","betray","better","between","beyond","bicycle","bid","bike","bind","biology","bird","birth","bitter","black","blade","blame","blanket","blast","bleak","bless","blind","blood","blossom","blouse","blue","blur","blush","board","boat","body","boil","bomb","bone","bonus","book","boost","border","boring","borrow","boss","bottom","bounce","box","boy","bracket","brain","brand","brass","brave","bread","breeze","brick","bridge","brief","bright","bring","brisk","broccoli","broken","bronze","broom","brother","brown","brush","bubble","buddy","budget","buffalo","build","bulb","bulk","bullet","bundle","bunker","burden","burger","burst","bus","business","busy","butter","buyer","buzz","cabbage","cabin","cable","cactus","cage","cake","call","calm","camera","camp","can","canal","cancel","candy","cannon","canoe","canvas","canyon","capable","capital","captain","car","carbon","card","cargo","carpet","carry","cart","case","cash","casino","castle","casual","cat","catalog","catch","category","cattle","caught","cause","caution","cave","ceiling","celery","cement","census","century","cereal","certain","chair","chalk","champion","change","chaos","chapter","charge","chase","chat","cheap","check","cheese","chef","cherry","chest","chicken","chief","child","chimney","choice","choose","chronic","chuckle","chunk","churn","cigar","cinnamon","circle","citizen","city","civil","claim","clap","clarify","claw","clay","clean","clerk","clever","click","client","cliff","climb","clinic","clip","clock","clog","close","cloth","cloud","clown","club","clump","cluster","clutch","coach","coast","coconut","code","coffee","coil","coin","collect","color","column","combine","come","comfort","comic","common","company","concert","conduct","confirm","congress","connect","consider","control","convince","cook","cool","copper","copy","coral","core","corn","correct","cost","cotton","couch","country","couple","course","cousin","cover","coyote","crack","cradle","craft","cram","crane","crash","crater","crawl","crazy","cream","credit","creek","crew","cricket","crime","crisp","critic","crop","cross","crouch","crowd","crucial","cruel","cruise","crumble","crunch","crush","cry","crystal","cube","culture","cup","cupboard","curious","current","curtain","curve","cushion","custom","cute","cycle","dad","damage","damp","dance","danger","daring","dash","daughter","dawn","day","deal","debate","debris","decade","december","decide","decline","decorate","decrease","deer","defense","define","defy","degree","delay","deliver","demand","demise","denial","dentist","deny","depart","depend","deposit","depth","deputy","derive","describe","desert","design","desk","despair","destroy","detail","detect","develop","device","devote","diagram","dial","diamond","diary","dice","diesel","diet","differ","digital","dignity","dilemma","dinner","dinosaur","direct","dirt","disagree","discover","disease","dish","dismiss","disorder","display","distance","divert","divide","divorce","dizzy","doctor","document","dog","doll","dolphin","domain","donate","donkey","donor","door","dose","double","dove","draft","dragon","drama","drastic","draw","dream","dress","drift","drill","drink","drip","drive","drop","drum","dry","duck","dumb","dune","during","dust","dutch","duty","dwarf","dynamic","eager","eagle","early","earn","earth","easily","east","easy","echo","ecology","economy","edge","edit","educate","effort","egg","eight","either","elbow","elder","electric","elegant","element","elephant","elevator","elite","else","embark","embody","embrace","emerge","emotion","employ","empower","empty","enable","enact","end","endless","endorse","enemy","energy","enforce","engage","engine","enhance","enjoy","enlist","enough","enrich","enroll","ensure","enter","entire","entry","envelope","episode","equal","equip","era","erase","erode","erosion","error","erupt","escape","essay","essence","estate","eternal","ethics","evidence","evil","evoke","evolve","exact","example","excess","exchange","excite","exclude","excuse","execute","exercise","exhaust","exhibit","exile","exist","exit","exotic","expand","expect","expire","explain","expose","express","extend","extra","eye","eyebrow","fabric","face","faculty","fade","faint","faith","fall","false","fame","family","famous","fan","fancy","fantasy","farm","fashion","fat","fatal","father","fatigue","fault","favorite","feature","february","federal","fee","feed","feel","female","fence","festival","fetch","fever","few","fiber","fiction","field","figure","file","film","filter","final","find","fine","finger","finish","fire","firm","first","fiscal","fish","fit","fitness","fix","flag","flame","flash","flat","flavor","flee","flight","flip","float","flock","floor","flower","fluid","flush","fly","foam","focus","fog","foil","fold","follow","food","foot","force","forest","forget","fork","fortune","forum","forward","fossil","foster","found","fox","fragile","frame","frequent","fresh","friend","fringe","frog","front","frost","frown","frozen","fruit","fuel","fun","funny","furnace","fury","future","gadget","gain","galaxy","gallery","game","gap","garage","garbage","garden","garlic","garment","gas","gasp","gate","gather","gauge","gaze","general","genius","genre","gentle","genuine","gesture","ghost","giant","gift","giggle","ginger","giraffe","girl","give","glad","glance","glare","glass","glide","glimpse","globe","gloom","glory","glove","glow","glue","goat","goddess","gold","good","goose","gorilla","gospel","gossip","govern","gown","grab","grace","grain","grant","grape","grass","gravity","great","green","grid","grief","grit","grocery","group","grow","grunt","guard","guess","guide","guilt","guitar","gun","gym","habit","hair","half","hammer","hamster","hand","happy","harbor","hard","harsh","harvest","hat","have","hawk","hazard","head","health","heart","heavy","hedgehog","height","hello","helmet","help","hen","hero","hidden","high","hill","hint","hip","hire","history","hobby","hockey","hold","hole","holiday","hollow","home","honey","hood","hope","horn","horror","horse","hospital","host","hotel","hour","hover","hub","huge","human","humble","humor","hundred","hungry","hunt","hurdle","hurry","hurt","husband","hybrid","ice","icon","idea","identify","idle","ignore","ill","illegal","illness","image","imitate","immense","immune","impact","impose","improve","impulse","inch","include","income","increase","index","indicate","indoor","industry","infant","inflict","inform","inhale","inherit","initial","inject","injury","inmate","inner","innocent","input","inquiry","insane","insect","inside","inspire","install","intact","interest","into","invest","invite","involve","iron","island","isolate","issue","item","ivory","jacket","jaguar","jar","jazz","jealous","jeans","jelly","jewel","job","join","joke","journey","joy","judge","juice","jump","jungle","junior","junk","just","kangaroo","keen","keep","ketchup","key","kick","kid","kidney","kind","kingdom","kiss","kit","kitchen","kite","kitten","kiwi","knee","knife","knock","know","lab","label","labor","ladder","lady","lake","lamp","language","laptop","large","later","latin","laugh","laundry","lava","law","lawn","lawsuit","layer","lazy","leader","leaf","learn","leave","lecture","left","leg","legal","legend","leisure","lemon","lend","length","lens","leopard","lesson","letter","level","liar","liberty","library","license","life","lift","light","like","limb","limit","link","lion","liquid","list","little","live","lizard","load","loan","lobster","local","lock","logic","lonely","long","loop","lottery","loud","lounge","love","loyal","lucky","luggage","lumber","lunar","lunch","luxury","lyrics","machine","mad","magic","magnet","maid","mail","main","major","make","mammal","man","manage","mandate","mango","mansion","manual","maple","marble","march","margin","marine","market","marriage","mask","mass","master","match","material","math","matrix","matter","maximum","maze","meadow","mean","measure","meat","mechanic","medal","media","melody","melt","member","memory","mention","menu","mercy","merge","merit","merry","mesh","message","metal","method","middle","midnight","milk","million","mimic","mind","minimum","minor","minute","miracle","mirror","misery","miss","mistake","mix","mixed","mixture","mobile","model","modify","mom","moment","monitor","monkey","monster","month","moon","moral","more","morning","mosquito","mother","motion","motor","mountain","mouse","move","movie","much","muffin","mule","multiply","muscle","museum","mushroom","music","must","mutual","myself","mystery","myth","naive","name","napkin","narrow","nasty","nation","nature","near","neck","need","negative","neglect","neither","nephew","nerve","nest","net","network","neutral","never","news","next","nice","night","noble","noise","nominee","noodle","normal","north","nose","notable","note","nothing","notice","novel","now","nuclear","number","nurse","nut","oak","obey","object","oblige","obscure","observe","obtain","obvious","occur","ocean","october","odor","off","offer","office","often","oil","okay","old","olive","olympic","omit","once","one","onion","online","only","open","opera","opinion","oppose","option","orange","orbit","orchard","order","ordinary","organ","orient","original","orphan","ostrich","other","outdoor","outer","output","outside","oval","oven","over","own","owner","oxygen","oyster","ozone","pact","paddle","page","pair","palace","palm","panda","panel","panic","panther","paper","parade","parent","park","parrot","party","pass","patch","path","patient","patrol","pattern","pause","pave","payment","peace","peanut","pear","peasant","pelican","pen","penalty","pencil","people","pepper","perfect","permit","person","pet","phone","photo","phrase","physical","piano","picnic","picture","piece","pig","pigeon","pill","pilot","pink","pioneer","pipe","pistol","pitch","pizza","place","planet","plastic","plate","play","please","pledge","pluck","plug","plunge","poem","poet","point","polar","pole","police","pond","pony","pool","popular","portion","position","possible","post","potato","pottery","poverty","powder","power","practice","praise","predict","prefer","prepare","present","pretty","prevent","price","pride","primary","print","priority","prison","private","prize","problem","process","produce","profit","program","project","promote","proof","property","prosper","protect","proud","provide","public","pudding","pull","pulp","pulse","pumpkin","punch","pupil","puppy","purchase","purity","purpose","purse","push","put","puzzle","pyramid","quality","quantum","quarter","question","quick","quit","quiz","quote","rabbit","raccoon","race","rack","radar","radio","rail","rain","raise","rally","ramp","ranch","random","range","rapid","rare","rate","rather","raven","raw","razor","ready","real","reason","rebel","rebuild","recall","receive","recipe","record","recycle","reduce","reflect","reform","refuse","region","regret","regular","reject","relax","release","relief","rely","remain","remember","remind","remove","render","renew","rent","reopen","repair","repeat","replace","report","require","rescue","resemble","resist","resource","response","result","retire","retreat","return","reunion","reveal","review","reward","rhythm","rib","ribbon","rice","rich","ride","ridge","rifle","right","rigid","ring","riot","ripple","risk","ritual","rival","river","road","roast","robot","robust","rocket","romance","roof","rookie","room","rose","rotate","rough","round","route","royal","rubber","rude","rug","rule","run","runway","rural","sad","saddle","sadness","safe","sail","salad","salmon","salon","salt","salute","same","sample","sand","satisfy","satoshi","sauce","sausage","save","say","scale","scan","scare","scatter","scene","scheme","school","science","scissors","scorpion","scout","scrap","screen","script","scrub","sea","search","season","seat","second","secret","section","security","seed","seek","segment","select","sell","seminar","senior","sense","sentence","series","service","session","settle","setup","seven","shadow","shaft","shallow","share","shed","shell","sheriff","shield","shift","shine","ship","shiver","shock","shoe","shoot","shop","short","shoulder","shove","shrimp","shrug","shuffle","shy","sibling","sick","side","siege","sight","sign","silent","silk","silly","silver","similar","simple","since","sing","siren","sister","situate","six","size","skate","sketch","ski","skill","skin","skirt","skull","slab","slam","sleep","slender","slice","slide","slight","slim","slogan","slot","slow","slush","small","smart","smile","smoke","smooth","snack","snake","snap","sniff","snow","soap","soccer","social","sock","soda","soft","solar","soldier","solid","solution","solve","someone","song","soon","sorry","sort","soul","sound","soup","source","south","space","spare","spatial","spawn","speak","special","speed","spell","spend","sphere","spice","spider","spike","spin","spirit","split","spoil","sponsor","spoon","sport","spot","spray","spread","spring","spy","square","squeeze","squirrel","stable","stadium","staff","stage","stairs","stamp","stand","start","state","stay","steak","steel","stem","step","stereo","stick","still","sting","stock","stomach","stone","stool","story","stove","strategy","street","strike","strong","struggle","student","stuff","stumble","style","subject","submit","subway","success","such","sudden","suffer","sugar","suggest","suit","summer","sun","sunny","sunset","super","supply","supreme","sure","surface","surge","surprise","surround","survey","suspect","sustain","swallow","swamp","swap","swarm","swear","sweet","swift","swim","swing","switch","sword","symbol","symptom","syrup","system","table","tackle","tag","tail","talent","talk","tank","tape","target","task","taste","tattoo","taxi","teach","team","tell","ten","tenant","tennis","tent","term","test","text","thank","that","theme","then","theory","there","they","thing","this","thought","three","thrive","throw","thumb","thunder","ticket","tide","tiger","tilt","timber","time","tiny","tip","tired","tissue","title","toast","tobacco","today","toddler","toe","together","toilet","token","tomato","tomorrow","tone","tongue","tonight","tool","tooth","top","topic","topple","torch","tornado","tortoise","toss","total","tourist","toward","tower","town","toy","track","trade","traffic","tragic","train","transfer","trap","trash","travel","tray","treat","tree","trend","trial","tribe","trick","trigger","trim","trip","trophy","trouble","truck","true","truly","trumpet","trust","truth","try","tube","tuition","tumble","tuna","tunnel","turkey","turn","turtle","twelve","twenty","twice","twin","twist","two","type","typical","ugly","umbrella","unable","unaware","uncle","uncover","under","undo","unfair","unfold","unhappy","uniform","unique","unit","universe","unknown","unlock","until","unusual","unveil","update","upgrade","uphold","upon","upper","upset","urban","urge","usage","use","used","useful","useless","usual","utility","vacant","vacuum","vague","valid","valley","valve","van","vanish","vapor","various","vast","vault","vehicle","velvet","vendor","venture","venue","verb","verify","version","very","vessel","veteran","viable","vibrant","vicious","victory","video","view","village","vintage","violin","virtual","virus","visa","visit","visual","vital","vivid","vocal","voice","void","volcano","volume","vote","voyage","wage","wagon","wait","walk","wall","walnut","want","warfare","warm","warrior","wash","wasp","waste","water","wave","way","wealth","weapon","wear","weasel","weather","web","wedding","weekend","weird","welcome","west","wet","whale","what","wheat","wheel","when","where","whip","whisper","wide","width","wife","wild","will","win","window","wine","wing","wink","winner","winter","wire","wisdom","wise","wish","witness","wolf","woman","wonder","wood","wool","word","work","world","worry","worth","wrap","wreck","wrestle","wrist","write","wrong","yard","year","yellow","you","young","youth","zebra","zero","zone","zoo"];
 
-    <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
-            integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL"
-            crossorigin="anonymous" defer></script>
-    <!-- Alpine.js -->
-    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.2/dist/cdn.min.js"
-            integrity="sha384-tdcclI3qSCW7QMlm1wTf5aYctcwpxNqszsU+BJCA7HfXmWAxuNPBqWmJrnmZ4er7"
-            crossorigin="anonymous" defer></script>
-    <!-- BIP39 wordlist + helpers -->
-    <script src="js/bip39.js?v=mnvrorbz"></script>
-    <!-- App -->
-    <script src="js/app.js?v=mnvrorbz"></script>
+async function sha256(bytes) {
+    const buf = new Uint8Array(bytes).buffer;
+    const hash = await crypto.subtle.digest('SHA-256', buf);
+    return Array.from(new Uint8Array(hash));
+}
+
+function bytesToHex(bytes) {
+    return bytes.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function toBits(bytes) {
+    return bytes.map(b => b.toString(2).padStart(8, '0')).join('');
+}
+
+// BIP39: checksum = ENT/32 bits of SHA-256(entropy), then 11-bit word indices
+async function entropyToMnemonic(entropyBytes) {
+    const csLen = (entropyBytes.length * 8) / 32;
+    const hashBytes = await sha256(entropyBytes);
+    const allBits = toBits(entropyBytes) + toBits(hashBytes).slice(0, csLen);
+    const words = [];
+    for (let i = 0; i + 11 <= allBits.length; i += 11) {
+        words.push(WORDLIST[parseInt(allBits.slice(i, i + 11), 2)]);
+    }
+    return words;
+}
+
+/* UI */
+const wcEl      = document.getElementById('wc');
+const grid      = document.getElementById('grid');
+const entEl     = document.getElementById('ent');
+const errEl     = document.getElementById('err');
+const mixEl     = document.getElementById('mixBlocks');
+const blocksEl  = document.getElementById('blocksInfo');
+const genBtn    = document.getElementById('gen');
+const userSaltEl = document.getElementById('userSalt');
+const saltEye   = document.getElementById('saltEye');
+const saltHint  = document.getElementById('saltHint');
+const copyBtn   = document.getElementById('copyBtn');
+let lastWords = []; // snapshot of the current seed for Copy
+
+// Same hint policy as the main app (length alone is NOT entropy)
+function updateSaltHint() {
+    const n = userSaltEl.value.length;
+    saltHint.textContent =
+        n === 0  ? 'Empty — the system CSPRNG salt is always used.'
+      : n < 6    ? 'Too short (' + n + ' chars) — easy to guess.'
+      : n < 16   ? 'OK (' + n + ' chars) — longer and harder-to-guess is better.'
+      :            'Long (' + n + ' chars) — but length alone is not entropy.';
+}
+userSaltEl.addEventListener('input', updateSaltHint);
+updateSaltHint();
+
+saltEye.addEventListener('click', () => {
+    const show = userSaltEl.type === 'password';
+    userSaltEl.type = show ? 'text' : 'password';
+    saltEye.textContent = show ? 'Hide' : 'Show';
+    saltEye.title = (show ? 'Hide' : 'Show') + ' user salt';
+});
+
+// Fetch + validate live Nano blockhashes (same rules as the main app):
+// entry must be an object, hash = exactly 64 hex chars, dedupe, cap at 16.
+async function fetchBlockBytes(maxBlocks) {
+    const res = await fetch('https://api.nanexplorer.com/last-blocks?network=nano', { cache: 'no-store' });
+    if (!res.ok) throw new Error('Block API HTTP ' + res.status);
+    const data = await res.json();
+    if (!data || !Array.isArray(data.last)) throw new Error('Malformed payload shape: expected { last: [...] }');
+    const seen = new Set();
+    const bytes = [];
+    for (const b of data.last.slice(0, 64)) {
+        const h = (b && typeof b.hash === 'string') ? b.hash.trim().toUpperCase() : '';
+        if (!/^[0-9A-F]{64}$/.test(h) || seen.has(h)) continue;
+        seen.add(h);
+        for (let i = 0; i + 1 < 64; i += 2) bytes.push(parseInt(h.slice(i, i + 2), 16));
+        if (seen.size >= maxBlocks) break;
+    }
+    if (!seen.size) throw new Error('No valid blockhash in API response');
+    return { bytes, count: seen.size, hashes: Array.from(seen) };
+}
+
+async function generate() {
+    errEl.textContent = '';
+    blocksEl.textContent = '';
+    genBtn.disabled = true;
+    try {
+        // Fail closed: never fall back to a weak RNG
+        if (typeof crypto === 'undefined' || !crypto.getRandomValues || !crypto.subtle) {
+            throw new Error('Secure RNG unavailable — no seed was generated.');
+        }
+        const byteLen = { 12: 16, 15: 20, 18: 24, 24: 32 }[wcEl.value];
+        if (!byteLen) throw new Error('Unsupported word count');
+
+        const userSaltBytes = userSaltEl.value
+            ? Array.from(new TextEncoder().encode(userSaltEl.value))
+            : [];
+
+        let entropyBytes;
+        if (mixEl.checked || userSaltBytes.length) {
+            // Same input order as the main app:
+            // entropy = SHA-256( CSPRNG-salt(32B) ++ utf8(userSalt) ++ blockhashBytes )[0 : ENT/8]
+            const saltArr = new Uint8Array(32);
+            crypto.getRandomValues(saltArr);
+            let blockBytes = [], info = 'Inputs mixed: 32B CSPRNG salt';
+            if (userSaltBytes.length) info += ' + user salt';
+            if (mixEl.checked) {
+                const r = await fetchBlockBytes(16);
+                blockBytes = r.bytes;
+                info += ' + ' + r.count + ' blocks  ·  ' + r.hashes.map(h => h.slice(0, 8)).join(' ');
+            } else {
+                info += ' (no blocks)';
+            }
+            entropyBytes = (await sha256(Array.from(saltArr).concat(userSaltBytes, blockBytes))).slice(0, byteLen);
+            blocksEl.textContent = info;
+        } else {
+            // Standard BIP39: direct CSPRNG bytes (offline default)
+            const arr = new Uint8Array(byteLen);
+            crypto.getRandomValues(arr);
+            entropyBytes = Array.from(arr);
+        }
+        const words = await entropyToMnemonic(entropyBytes);
+        if (words.length !== Number(wcEl.value)) throw new Error('Unexpected mnemonic length');
+        for (const w of words) {
+            if (!WORDLIST.includes(w)) throw new Error('Invalid word: ' + w);
+        }
+
+        grid.textContent = ''; // reset (textContent only — never innerHTML)
+        lastWords = words;
+        words.forEach((w, i) => {
+            const cell = document.createElement('div');
+            cell.className = 'word';
+            const num = document.createElement('b');
+            num.textContent = (i + 1) + '.';
+            const span = document.createElement('span');
+            span.textContent = w;
+            cell.append(num, span);
+            grid.append(cell);
+        });
+        entEl.textContent = bytesToHex(entropyBytes);
+    } catch (e) {
+        grid.textContent = '';
+        entEl.textContent = '—';
+        lastWords = [];
+        errEl.textContent = e.message || 'Generation failed';
+    } finally {
+        genBtn.disabled = false;
+    }
+}
+
+let copyReset = null;
+async function copySeed() {
+    if (!lastWords.length) { errEl.textContent = 'Generate a seed phrase first.'; return; }
+    try {
+        await navigator.clipboard.writeText(lastWords.join(' '));
+        copyBtn.textContent = 'Copied!';
+        clearTimeout(copyReset);
+        copyReset = setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1500);
+    } catch (e) {
+        errEl.textContent = 'Cannot copy: ' + e.message;
+    }
+}
+copyBtn.addEventListener('click', copySeed);
+
+document.getElementById('gen').addEventListener('click', generate);
+    </script>
 </body>
 </html>
