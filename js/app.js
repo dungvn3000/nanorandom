@@ -96,6 +96,16 @@ function seedApp() {
 
         fetching: false,
 
+        // A Nano blockhash is a 256-bit value => exactly 64 uppercase hex chars
+        _isBlockHash(h) {
+            return typeof h === 'string' && /^[0-9A-F]{64}$/.test(h);
+        },
+
+        // UI-bound strings: keep them textual and short (a nano_ address is 65 chars)
+        _safeStr(v) {
+            return typeof v === 'string' ? v.slice(0, 128) : '';
+        },
+
         async fetchBlocks() {
             if (this.fetching) return; // in-flight guard
             this.fetching = true;
@@ -103,7 +113,16 @@ function seedApp() {
                 const res = await fetch('https://api.nanexplorer.com/last-blocks?network=nano');
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 const data = await res.json();
-                const list = (data && data.last) || [];
+
+                // Payload must be an object whose `last` is a real array; cap it (normal response = 10 blocks)
+                const MAX_PER_POLL = 64;
+                if (!data || typeof data !== 'object' || !Array.isArray(data.last)) {
+                    throw new Error('Malformed payload shape: expected { last: [...] }');
+                }
+                const list = data.last.slice(0, MAX_PER_POLL);
+                if (Array.isArray(data.last) && data.last.length > MAX_PER_POLL) {
+                    console.warn('[api] oversized block list truncated:', data.last.length, '->', MAX_PER_POLL);
+                }
                 if (!list.length) return;
 
                 if (!this.connected) {
@@ -111,13 +130,17 @@ function seedApp() {
                     console.log('[api] connected, polling every 3s');
                 }
 
-                // One-pass: collect only unseen hashes, mutate reactive state once
+                // One-pass: collect only unseen, well-formed hashes; mutate reactive state once
                 const newHashes = [];
                 for (const b of list) {
-                    const h = b.hash;
-                    if (!h || this.seenHashes[h]) continue;
+                    if (!b || typeof b !== 'object') continue; // skip non-object entries
+                    const h = this._safeStr(b.hash).trim().toUpperCase();
+                    if (!this._isBlockHash(h) || this.seenHashes[h]) {
+                        if (h && !this._isBlockHash(h)) console.warn('[api] rejected malformed blockhash', h.slice(0, 16) + '...');
+                        continue;
+                    }
                     this.seenHashes[h] = true;
-                    newHashes.push(b);
+                    newHashes.push({ hash: h, account: this._safeStr(b.account), type: this._safeStr(b.type) });
                 }
                 if (!newHashes.length) return;
 
