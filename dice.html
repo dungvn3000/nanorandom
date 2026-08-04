@@ -306,7 +306,7 @@ function showResult(values, sides, blockHash, source) {
         ' = <b>' + sum + '</b>';
     const short = blockHash ? blockHash.slice(0, 12) + '\u2026' : '—';
     if (blockHash) {
-        blocksrc.innerHTML = 'Seeded by block <a href="https://nanexplorer.com/block/' + blockHash +
+        blocksrc.innerHTML = 'Seeded by block <a href="https://nanexplorer.com/nano/blocks/' + blockHash +
             '" target="_blank" rel="noopener">' + short + '</a>';
     } else {
         blocksrc.textContent = 'Seeded by latest Nano block';
@@ -327,7 +327,7 @@ function pushFeed(values, sides, sum, blockHash, source) {
     const hash = document.createElement('span');
     hash.className = 'hash';
     if (blockHash) {
-        hash.innerHTML = '<a href="https://nanexplorer.com/block/' + blockHash +
+        hash.innerHTML = '<a href="https://nanexplorer.com/nano/blocks/' + blockHash +
             '" target="_blank" rel="noopener">' + blockHash.slice(0, 10) + '\u2026</a>';
     } else {
         hash.textContent = '—';
