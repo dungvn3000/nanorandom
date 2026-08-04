@@ -113,12 +113,13 @@
         <label class="chk" for="count">Dice</label>
         <input type="range" id="countSlider" min="1" max="20" step="1" value="2" aria-label="Number of dice">
         <input type="number" id="count" min="1" max="20" step="1" value="2" aria-label="Number of dice">
-        <button id="roll" type="button">Roll now</button>
+        <button id="startBtn" type="button">Start</button>
+        <button id="stopBtn" class="eyebtn" type="button" disabled>Stop</button>
     </div>
 
     <div class="livebar">
         <span class="dot idle" id="dot"></span>
-        <span class="status" id="status">Connecting to Nano network&hellip;</span>
+        <span class="status" id="status">Stopped &mdash; press Start to watch for new blocks</span>
         <span class="meta" id="meta"></span>
     </div>
 
@@ -247,7 +248,8 @@ const diceEl   = document.getElementById('dice');
 const sumline  = document.getElementById('sumline');
 const blocksrc = document.getElementById('blocksrc');
 const errEl    = document.getElementById('err');
-const rollBtn  = document.getElementById('roll');
+const startBtn = document.getElementById('startBtn');
+const stopBtn  = document.getElementById('stopBtn');
 const dot      = document.getElementById('dot');
 const statusEl = document.getElementById('status');
 const metaEl   = document.getElementById('meta');
@@ -280,7 +282,6 @@ function faceLabel(value, sides) {
 
 function animateRoll(sides, count, finalValues, done) {
     rolling = true;
-    rollBtn.disabled = true;
     const diceNodes = [];
     diceEl.textContent = '';
     for (let i = 0; i < count; i++) {
@@ -304,7 +305,6 @@ function animateRoll(sides, count, finalValues, done) {
                 d.appendChild(faceLabel(finalValues[i], sides));
             });
             rolling = false;
-            rollBtn.disabled = false;
             if (done) done();
         }
     }, 70);
@@ -407,27 +407,24 @@ async function startWatch() {
         errEl.textContent = 'Web Crypto is required for this demo.';
         return;
     }
+    if (watchTimer) return; // already running
+    errEl.textContent = '';
+    startBtn.disabled = true;
+    stopBtn.disabled = false;
     setLive('wait', 'Connecting to Nano network&hellip;', '');
     await checkForNewBlock();
     if (watchTimer) clearInterval(watchTimer);
     watchTimer = setInterval(checkForNewBlock, 2500);
 }
 
-// manual roll: use the latest known block (or fetch a fresh one)
-async function manualRoll() {
-    if (rolling) return;
-    errEl.textContent = '';
-    try {
-        const blocks = await fetchLatestBlock();
-        const newest = blocks[0];
-        lastBlockHash = newest.hash;
-        setLive('', 'Manual roll &mdash; using latest block', newest.hash.slice(0, 12) + '\u2026');
-        await rollFromBlock(newest, 'manual');
-        setLive('', 'Watching Nano network &mdash; next roll on next block', 'last: ' + newest.hash.slice(0, 12) + '\u2026');
-    } catch (e) {
-        errEl.textContent = e.message || 'Block fetch failed';
-        setLive('err', 'Block fetch failed', '');
-    }
+function stopWatch() {
+    if (watchTimer) clearInterval(watchTimer);
+    watchTimer = null;
+    lastBlockHash = null; // force baseline rebuild on next Start
+    rolling = false;
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+    setLive('idle', 'Stopped &mdash; press Start to watch for new blocks', '');
 }
 
 countEl.addEventListener('input', () => {
@@ -436,14 +433,11 @@ countEl.addEventListener('input', () => {
     slider.value = v;
 });
 slider.addEventListener('input', () => { countEl.value = slider.value; });
-rollBtn.addEventListener('click', manualRoll);
+startBtn.addEventListener('click', startWatch);
+stopBtn.addEventListener('click', stopWatch);
 
-document.addEventListener('keydown', (e) => {
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
-    if (e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); manualRoll(); }
-});
-
-startWatch();
+// initial stopped state
+setLive('idle', 'Stopped &mdash; press Start to watch for new blocks', '');
     </script>
 </body>
 </html>
