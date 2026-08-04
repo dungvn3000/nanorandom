@@ -131,7 +131,7 @@
 <pre><span class="c"># on every new Nano block (hash H, 64-hex &rarr; 32 raw bytes)</span>
 <span class="k">salt</span>   = crypto.getRandomValues(32)              <span class="c"># fresh CSPRNG salt, per roll</span>
 <span class="k">prefix</span> = <span class="v">salt</span> ++ bytes(<span class="h">H</span>)                       <span class="c"># 64 bytes: secret anchor + public block</span>
-<span class="k">stream</span>  = SHA-256( <span class="v">prefix</span> ++ counter )            <span class="c"># counter-mode byte stream, counter = 0,1,2,&hellip;</span>
+<span class="k">stream</span>  = SHA-256( <span class="v">prefix</span> ++ uint64_be(<span class="v">counter</span>) )  <span class="c"># counter-mode byte stream, counter = 0,1,2,&hellip;</span>
 <span class="k">face</span>    = 1 + unbiased_int( [0, sides), <span class="v">stream</span> )  <span class="c"># one face per die, rejection sampling</span>
 
 <span class="c"># unbiased_int &mdash; rejection sampling (no modulo bias)</span>
@@ -143,7 +143,7 @@ return v mod sides</pre>
         <div class="legend">
             <b>salt</b> = 32 raw CSPRNG bytes (secret, never sent) &nbsp;&middot;&nbsp;
             <b>H</b> = triggering Nano blockhash (public, verifiable) &nbsp;&middot;&nbsp;
-            <b>counter</b> = increments each 32-byte stream block &nbsp;&middot;&nbsp;
+            <b>counter</b> = 64-bit big-endian, increments each 32-byte stream block &nbsp;&middot;&nbsp;
             <b>lim</b> = largest multiple of <i>sides</i> &le; 256<sup>k</sup>
         </div>
     </div>
@@ -205,11 +205,21 @@ async function fetchLatestBlock() {
 }
 
 // SHA-256 counter-mode stream block_i = SHA-256( saltRaw(32B) ++ blockBytes ++ counter_i )
+// counter_i is a 64-bit big-endian integer (no wrap-around at 256)
+function uint64be(value) {
+    const bytes = new Array(8).fill(0);
+    for (let i = 7; i >= 0; i--) {
+        bytes[i] = Number(value & 0xffn);
+        value >>= 8n;
+    }
+    return bytes;
+}
+
 function counterStream(prefixBytes) {
-    let counter = 0, buf = [];
+    let counter = 0n, buf = [];
     return async () => {
         if (!buf.length) {
-            const h = await sha256(prefixBytes.concat([counter & 0xff]));
+            const h = await sha256(prefixBytes.concat(uint64be(counter)));
             buf.push(...h);
             counter++;
         }
