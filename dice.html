@@ -113,13 +113,13 @@
         <label class="chk" for="count">Dice</label>
         <input type="range" id="countSlider" min="1" max="20" step="1" value="2" aria-label="Number of dice">
         <input type="number" id="count" min="1" max="20" step="1" value="2" aria-label="Number of dice">
-        <button id="startBtn" type="button">Start</button>
-        <button id="stopBtn" class="eyebtn" type="button" disabled>Stop</button>
+        <button id="startBtn" type="button" disabled>Start</button>
+        <button id="stopBtn" class="eyebtn" type="button">Stop</button>
     </div>
 
     <div class="livebar">
         <span class="dot idle" id="dot"></span>
-        <span class="status" id="status">Stopped &mdash; press Start to watch for new blocks</span>
+        <span class="status" id="status">Connecting to Nano network&hellip;</span>
         <span class="meta" id="meta"></span>
     </div>
 
@@ -436,8 +436,8 @@ slider.addEventListener('input', () => { countEl.value = slider.value; });
 startBtn.addEventListener('click', startWatch);
 stopBtn.addEventListener('click', stopWatch);
 
-// initial stopped state
-setLive('idle', 'Stopped &mdash; press Start to watch for new blocks', '');
+// auto-start on load
+startWatch();
     </script>
 </body>
 </html>
