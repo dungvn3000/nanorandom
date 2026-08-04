@@ -113,6 +113,7 @@ python3 -m http.server 8080   # http://localhost:8080
 nanorandom/
 ├── index.html    # BIP39 seed phrase generator (markup + CSS + JS + wordlist)
 ├── password.html # independent CSPRNG password generator
+├── dice.html     # live CSPRNG dice roller (rejection sampling, optional blockhash mixing)
 └── README.md     # this file
 ```
 

@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Live dice roller that auto-rolls on every new Nano block — CSPRNG + blockhash mixing, rejection sampling, no modulo bias.">
+<title>NanoRandom — Live Dice Roller</title>
+<style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body { background: #0d1117; color: #e6edf3; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; max-width: 760px; margin: 0 auto; padding: 2em 1em; }
+    h1 { font-size: 1.2rem; font-weight: 600; }
+    h1 small { color: #8b949e; font-size: .75em; font-weight: normal; }
+    .row { display: flex; gap: .9em; align-items: center; flex-wrap: wrap; margin: 1em 0; }
+    .row.tight { margin: .6em 0; }
+    select, button, input[type="number"], input[type="range"] { background: #161b22; color: #e6edf3; border: 1px solid #30363d; border-radius: 6px; padding: .5em .8em; font: inherit; }
+    button { background: #1f6feb; border-color: #1f6feb; cursor: pointer; }
+    button:hover { filter: brightness(1.15); }
+    button:disabled { opacity: .55; cursor: default; }
+    .eyebtn { background: #161b22; color: #8b949e; border: 1px solid #30363d; }
+    .eyebtn:hover { filter: brightness(1.2); }
+    input[type="range"] { padding: 0; accent-color: #1f6feb; min-width: 200px; }
+    input[type="number"] { width: 5.5em; }
+    .chk { display: flex; gap: .4em; align-items: center; font-size: .9em; color: #c9d1d9; cursor: pointer; }
+    .chk input { accent-color: #1f6feb; }
+    .dim { color: #586069; font-size: .9em; }
+    .err { color: #f85149; min-height: 1.2em; }
+    .note { color: #8b949e; font-size: .85em; margin-top: 1.4em; line-height: 1.6; }
+    .note a { color: #58a6ff; }
+
+    /* live status bar */
+    .livebar { display: flex; gap: .6em; align-items: center; flex-wrap: wrap; margin: .8em 0; font-size: .9em; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: #3fb950; box-shadow: 0 0 8px #3fb950; animation: pulse 1.4s infinite; }
+    .dot.idle  { background: #586069; box-shadow: none; animation: none; }
+    .dot.wait  { background: #d29922; box-shadow: 0 0 8px #d29922; }
+    .dot.err   { background: #f85149; box-shadow: 0 0 8px #f85149; animation: none; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+    .livebar .status { color: #c9d1d9; }
+    .livebar .status b { color: #79c0ff; }
+    .livebar .meta { color: #586069; font-size: .85em; }
+
+    /* dice */
+    .dice { display: flex; flex-wrap: wrap; gap: .6em; margin: 1.2em 0 .6em; min-height: 4.5em; }
+    .die {
+        min-width: 3.4em; min-height: 3.4em; padding: .4em;
+        background: #161b22; border: 1px solid #30363d; border-radius: 10px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.7rem; font-weight: 700; line-height: 1;
+        position: relative; user-select: none;
+    }
+    .die .pip { color: #79c0ff; }
+    .die.rolling { animation: shake .09s infinite; }
+    @keyframes shake {
+        0%   { transform: translate(0,0) rotate(0deg); }
+        25%  { transform: translate(-2px,1px) rotate(-6deg); }
+        50%  { transform: translate(2px,-1px) rotate(5deg); }
+        75%  { transform: translate(-1px,2px) rotate(-4deg); }
+        100% { transform: translate(1px,-2px) rotate(3deg); }
+    }
+    .die.new { animation: pop .25s ease-out; }
+    @keyframes pop {
+        0%   { transform: scale(.4); opacity: 0; }
+        70%  { transform: scale(1.18); }
+        100% { transform: scale(1); opacity: 1; }
+    }
+    .sumline { color: #c9d1d9; font-size: .95em; margin: .4em 0; }
+    .sumline b { color: #79c0ff; }
+    .blocksrc { color: #8b949e; word-break: break-all; font-size: .8em; margin: .3em 0; min-height: 1.1em; }
+    .blocksrc a { color: #79c0ff; }
+
+    /* formula box */
+    .formula { margin: 1.2em 0; }
+    .formula .title { font-size: .85em; color: #8b949e; margin-bottom: .4em; }
+    .formula pre {
+        background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+        padding: .9em 1em; margin: 0; overflow-x: auto;
+        font-size: .82em; line-height: 1.55; color: #c9d1d9;
+    }
+    .formula pre .c { color: #586069; }          /* comment */
+    .formula pre .k { color: #79c0ff; }          /* keyword/fn  */
+    .formula pre .v { color: #7ee787; }          /* value/literal */
+    .formula pre .h { color: #ffa657; }          /* hash/highlight */
+    .formula .legend { font-size: .78em; color: #586069; margin-top: .5em; line-height: 1.6; }
+    .formula .legend b { color: #8b949e; font-weight: normal; }
+
+    /* live feed of block-triggered rolls */
+    .feed { margin-top: 1em; }
+    .feed .h { font-size: .8em; color: #8b949e; margin-bottom: .3em; }
+    .feed .item { display: flex; gap: .6em; align-items: center; padding: .35em 0; border-bottom: 1px solid #161b22; font-size: .82em; }
+    .feed .item .tag { color: #3fb950; font-size: .75em; }
+    .feed .item .tag.manual { color: #d29922; }
+    .feed .item .res { color: #c9d1d9; font-variant-numeric: tabular-nums; }
+    .feed .item .res b { color: #79c0ff; }
+    .feed .item .hash { color: #586069; margin-left: auto; }
+    .feed .item .hash a { color: #586069; }
+    .feed .empty { color: #586069; font-size: .85em; }
+</style>
+</head>
+<body>
+    <h1>Live Dice Roller <small>&mdash; auto-rolls on every new Nano block</small></h1>
+
+    <div class="row tight">
+        <label class="chk" for="sides">Sides</label>
+        <select id="sides" aria-label="Sides per die">
+            <option value="4">d4</option>
+            <option value="6" selected>d6</option>
+            <option value="8">d8</option>
+            <option value="10">d10</option>
+            <option value="12">d12</option>
+            <option value="20">d20</option>
+            <option value="100">d100</option>
+        </select>
+        <label class="chk" for="count">Dice</label>
+        <input type="range" id="countSlider" min="1" max="20" step="1" value="2" aria-label="Number of dice">
+        <input type="number" id="count" min="1" max="20" step="1" value="2" aria-label="Number of dice">
+        <button id="roll" type="button">Roll now</button>
+    </div>
+
+    <div class="livebar">
+        <span class="dot idle" id="dot"></span>
+        <span class="status" id="status">Connecting to Nano network&hellip;</span>
+        <span class="meta" id="meta"></span>
+    </div>
+
+    <div class="dice" id="dice" aria-live="polite"></div>
+    <div class="sumline" id="sumline"></div>
+    <div class="blocksrc" id="blocksrc"></div>
+
+    <div class="formula">
+        <div class="title">Formula &mdash; how each roll is derived</div>
+<pre><span class="c"># on every new Nano block (hash H, 64-hex &rarr; 32 raw bytes)</span>
+<span class="k">salt</span>   = crypto.getRandomValues(32)              <span class="c"># fresh CSPRNG salt, per roll</span>
+<span class="k">prefix</span> = <span class="v">salt</span> ++ bytes(<span class="h">H</span>)                       <span class="c"># 64 bytes: secret anchor + public block</span>
+<span class="k">stream</span>  = SHA-256( <span class="v">prefix</span> ++ counter )            <span class="c"># counter-mode byte stream, counter = 0,1,2,&hellip;</span>
+<span class="k">face</span>    = 1 + unbiased_int( [0, sides), <span class="v">stream</span> )  <span class="c"># one face per die, rejection sampling</span>
+
+<span class="c"># unbiased_int &mdash; rejection sampling (no modulo bias)</span>
+k   = 1 if sides &le; 256 else 2 if sides &le; 65536 else 4
+lim = 256<sup>k</sup> - (256<sup>k</sup> mod sides)
+do: v = read k bytes from stream (big-endian)
+while v &ge; lim                               <span class="c"># discard the modulo-bias zone, redraw</span>
+return v mod sides</pre>
+        <div class="legend">
+            <b>salt</b> = 32 raw CSPRNG bytes (secret, never sent) &nbsp;&middot;&nbsp;
+            <b>H</b> = triggering Nano blockhash (public, verifiable) &nbsp;&middot;&nbsp;
+            <b>counter</b> = increments each 32-byte stream block &nbsp;&middot;&nbsp;
+            <b>lim</b> = largest multiple of <i>sides</i> &le; 256<sup>k</sup>
+        </div>
+    </div>
+
+    <div class="feed" id="feed">
+        <div class="h">Live feed &mdash; one roll per new block</div>
+        <div class="empty" id="feedEmpty">Waiting for the first block&hellip;</div>
+    </div>
+
+    <p class="err" id="err" role="alert"></p>
+    <p class="note">
+        This page watches the Nano network in real time. Every time a <b>new block</b> is
+        confirmed, the dice roll automatically &mdash; each face is drawn uniformly via
+        <b>rejection sampling</b> (no modulo bias) from a SHA-256 counter-mode stream seeded
+        with a fresh 32-byte CSPRNG salt plus the triggering blockhash. The result depends on
+        that fresh, public, timestamped block &mdash; it is not reproducible from any previous
+        roll, and one broken browser RNG alone cannot collapse it.
+        <br><br>
+        Blockhashes are validated (exactly 64 hex chars, deduped) before use. Click
+        <b>Roll now</b> for an instant roll using the latest block, or just watch &mdash; new
+        blocks arrive continuously on the feeless Nano network.
+        <br><br>
+        <b>Self-contained file</b> &mdash; save this page (Ctrl/Cmd+S) and open it locally:
+        zero dependencies, no build step.
+        <br><br>
+        <a href="index.html">&larr; BIP39 seed phrase generator</a>
+        &nbsp;·&nbsp;
+        <a href="password.html">Password generator &rarr;</a>
+    </p>
+    <script>
+"use strict";
+
+async function sha256(bytes) {
+    const buf = new Uint8Array(bytes).buffer;
+    const hash = await crypto.subtle.digest('SHA-256', buf);
+    return Array.from(new Uint8Array(hash));
+}
+
+// Fetch + validate live Nano blockhashes (same rules as index.html / password.html):
+// entry must be an object, hash = exactly 64 hex chars, dedupe.
+async function fetchLatestBlock() {
+    const res = await fetch('https://api.nanexplorer.com/last-blocks?network=nano', { cache: 'no-store' });
+    if (!res.ok) throw new Error('Block API HTTP ' + res.status);
+    const data = await res.json();
+    if (!data || !Array.isArray(data.last) || !data.last.length) throw new Error('Malformed payload shape: expected { last: [...] }');
+    const seen = new Set();
+    const blocks = [];
+    for (const b of data.last.slice(0, 64)) {
+        const h = (b && typeof b.hash === 'string') ? b.hash.trim().toUpperCase() : '';
+        if (!/^[0-9A-F]{64}$/.test(h) || seen.has(h)) continue;
+        seen.add(h);
+        const bytes = [];
+        for (let i = 0; i + 1 < 64; i += 2) bytes.push(parseInt(h.slice(i, i + 2), 16));
+        blocks.push({ hash: h, bytes });
+        if (blocks.length >= 16) break;
+    }
+    if (!blocks.length) throw new Error('No valid blockhash in API response');
+    return blocks; // newest first
+}
+
+// SHA-256 counter-mode stream block_i = SHA-256( saltRaw(32B) ++ blockBytes ++ counter_i )
+function counterStream(prefixBytes) {
+    let counter = 0, buf = [];
+    return async () => {
+        if (!buf.length) {
+            const h = await sha256(prefixBytes.concat([counter & 0xff]));
+            buf.push(...h);
+            counter++;
+        }
+        return buf.shift();
+    };
+}
+
+// Unbiased integer in [0, n) from the given byte stream via rejection sampling
+async function pick(n, nextByte) {
+    const bytes = n <= 256 ? 1 : n <= 65536 ? 2 : 4;
+    const range = 256 ** bytes;
+    const limit = range - (range % n);
+    let v;
+    do {
+        v = 0;
+        for (let k = 0; k < bytes; k++) v = v * 256 + await nextByte();
+    } while (v >= limit);
+    return v % n;
+}
+
+const sidesEl  = document.getElementById('sides');
+const countEl  = document.getElementById('count');
+const slider   = document.getElementById('countSlider');
+const diceEl   = document.getElementById('dice');
+const sumline  = document.getElementById('sumline');
+const blocksrc = document.getElementById('blocksrc');
+const errEl    = document.getElementById('err');
+const rollBtn  = document.getElementById('roll');
+const dot      = document.getElementById('dot');
+const statusEl = document.getElementById('status');
+const metaEl   = document.getElementById('meta');
+const feedEl   = document.getElementById('feed');
+const feedEmpty = document.getElementById('feedEmpty');
+
+let rolling = false;
+let watchTimer = null;
+let lastBlockHash = null;       // last seen block hash — used to detect new blocks
+let feedItems = [];
+
+function clampCount(v) {
+    const n = parseInt(v, 10);
+    if (Number.isNaN(n)) return 2;
+    return Math.min(20, Math.max(1, n));
+}
+
+function setLive(state, text, meta) {
+    dot.className = 'dot ' + state;
+    statusEl.innerHTML = text || '';
+    metaEl.textContent = meta || '';
+}
+
+function faceLabel(value, sides) {
+    const span = document.createElement('span');
+    span.className = 'pip';
+    span.textContent = value;
+    return span;
+}
+
+function animateRoll(sides, count, finalValues, done) {
+    rolling = true;
+    rollBtn.disabled = true;
+    const diceNodes = [];
+    diceEl.textContent = '';
+    for (let i = 0; i < count; i++) {
+        const d = document.createElement('div');
+        d.className = 'die rolling';
+        d.textContent = '?';
+        diceEl.append(d);
+        diceNodes.push(d);
+    }
+    const frames = 10;
+    let frame = 0;
+    const interval = setInterval(() => {
+        diceNodes.forEach(d => { d.textContent = 1 + Math.floor(Math.random() * sides); });
+        frame++;
+        if (frame >= frames) {
+            clearInterval(interval);
+            diceNodes.forEach((d, i) => {
+                d.classList.remove('rolling');
+                d.classList.add('new');
+                d.textContent = '';
+                d.appendChild(faceLabel(finalValues[i], sides));
+            });
+            rolling = false;
+            rollBtn.disabled = false;
+            if (done) done();
+        }
+    }, 70);
+}
+
+function showResult(values, sides, blockHash, source) {
+    const sum = values.reduce((a, b) => a + b, 0);
+    sumline.innerHTML = values.map(v => '<b>' + v + '</b>').join(' + ') +
+        ' = <b>' + sum + '</b>';
+    const short = blockHash ? blockHash.slice(0, 12) + '\u2026' : '—';
+    if (blockHash) {
+        blocksrc.innerHTML = 'Seeded by block <a href="https://nanexplorer.com/block/' + blockHash +
+            '" target="_blank" rel="noopener">' + short + '</a>';
+    } else {
+        blocksrc.textContent = 'Seeded by latest Nano block';
+    }
+    pushFeed(values, sides, sum, blockHash, source);
+}
+
+function pushFeed(values, sides, sum, blockHash, source) {
+    if (feedEmpty) feedEmpty.remove();
+    const item = document.createElement('div');
+    item.className = 'item';
+    const tag = document.createElement('span');
+    tag.className = 'tag' + (source === 'manual' ? ' manual' : '');
+    tag.textContent = source === 'manual' ? 'manual' : 'block';
+    const res = document.createElement('span');
+    res.className = 'res';
+    res.innerHTML = 'd' + sides + ' \u00d7 ' + values.length + ': <b>' + values.join(',') + '</b> = <b>' + sum + '</b>';
+    const hash = document.createElement('span');
+    hash.className = 'hash';
+    if (blockHash) {
+        hash.innerHTML = '<a href="https://nanexplorer.com/block/' + blockHash +
+            '" target="_blank" rel="noopener">' + blockHash.slice(0, 10) + '\u2026</a>';
+    } else {
+        hash.textContent = '—';
+    }
+    item.append(tag, res, hash);
+    feedEl.prepend(item);
+    feedItems.unshift(item);
+    if (feedItems.length > 12) { feedItems.pop().remove(); }
+}
+
+async function doRoll(sides, count, blockHash, blockBytes, source) {
+    // Fail closed: never fall back to a weak RNG
+    if (typeof crypto === 'undefined' || !crypto.getRandomValues || !crypto.subtle) {
+        errEl.textContent = 'Secure RNG unavailable — no roll was generated.';
+        return;
+    }
+    const saltArr = new Uint8Array(32);
+    crypto.getRandomValues(saltArr);
+    const prefix = Array.from(saltArr).concat(blockBytes);
+    const nextByte = counterStream(prefix);
+    const values = [];
+    for (let i = 0; i < count; i++) values.push(1 + await pick(sides, nextByte));
+    animateRoll(sides, count, values, () => showResult(values, sides, blockHash, source));
+}
+
+async function rollFromBlock(block, source) {
+    errEl.textContent = '';
+    const sides = parseInt(sidesEl.value, 10);
+    const count = clampCount(countEl.value);
+    countEl.value = count;
+    slider.value = count;
+    if (![4, 6, 8, 10, 12, 20, 100].includes(sides)) {
+        errEl.textContent = 'Unsupported die';
+        return;
+    }
+    if (rolling) return;
+    await doRoll(sides, count, block.hash, block.bytes, source);
+}
+
+async function checkForNewBlock() {
+    try {
+        const blocks = await fetchLatestBlock();
+        const newest = blocks[0];
+        if (lastBlockHash === null) {
+            // first contact — establish baseline, don't roll
+            lastBlockHash = newest.hash;
+            setLive('', 'Watching Nano network &mdash; ready to roll on next block', 'last: ' + newest.hash.slice(0, 12) + '\u2026');
+            return;
+        }
+        if (newest.hash !== lastBlockHash) {
+            lastBlockHash = newest.hash;
+            setLive('', '<b>New block!</b> Rolling&hellip;', newest.hash.slice(0, 12) + '\u2026');
+            await rollFromBlock(newest, 'block');
+            setLive('', 'Watching Nano network &mdash; next roll on next block', 'last: ' + newest.hash.slice(0, 12) + '\u2026');
+        } else {
+            setLive('', 'Watching Nano network &mdash; next roll on next block', 'last: ' + newest.hash.slice(0, 12) + '\u2026');
+        }
+    } catch (e) {
+        setLive('err', 'Watch error &mdash; retrying', '');
+        errEl.textContent = e.message || 'Block fetch failed';
+    }
+}
+
+async function startWatch() {
+    if (typeof crypto === 'undefined' || !crypto.getRandomValues || !crypto.subtle) {
+        setLive('err', 'Secure RNG unavailable', '');
+        errEl.textContent = 'Web Crypto is required for this demo.';
+        return;
+    }
+    setLive('wait', 'Connecting to Nano network&hellip;', '');
+    await checkForNewBlock();
+    if (watchTimer) clearInterval(watchTimer);
+    watchTimer = setInterval(checkForNewBlock, 2500);
+}
+
+// manual roll: use the latest known block (or fetch a fresh one)
+async function manualRoll() {
+    if (rolling) return;
+    errEl.textContent = '';
+    try {
+        const blocks = await fetchLatestBlock();
+        const newest = blocks[0];
+        lastBlockHash = newest.hash;
+        setLive('', 'Manual roll &mdash; using latest block', newest.hash.slice(0, 12) + '\u2026');
+        await rollFromBlock(newest, 'manual');
+        setLive('', 'Watching Nano network &mdash; next roll on next block', 'last: ' + newest.hash.slice(0, 12) + '\u2026');
+    } catch (e) {
+        errEl.textContent = e.message || 'Block fetch failed';
+        setLive('err', 'Block fetch failed', '');
+    }
+}
+
+countEl.addEventListener('input', () => {
+    const v = clampCount(countEl.value);
+    countEl.value = v;
+    slider.value = v;
+});
+slider.addEventListener('input', () => { countEl.value = slider.value; });
+rollBtn.addEventListener('click', manualRoll);
+
+document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+    if (e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); manualRoll(); }
+});
+
+startWatch();
+    </script>
+</body>
+</html>
