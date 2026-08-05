@@ -170,7 +170,7 @@ return v mod sides</pre>
         <b>Self-contained file</b> &mdash; save this page (Ctrl/Cmd+S) and open it locally:
         zero dependencies, no build step.
         <br><br>
-        <a href="index.html">&larr; BIP39 seed phrase generator</a>
+        <a href="bip39.html">&larr; BIP39 seed phrase generator</a>
         &nbsp;·&nbsp;
         <a href="password.html">Password generator &rarr;</a>
     </p>
@@ -183,7 +183,7 @@ async function sha256(bytes) {
     return Array.from(new Uint8Array(hash));
 }
 
-// Fetch + validate live Nano blockhashes (same rules as index.html / password.html):
+// Fetch + validate live Nano blockhashes (same rules as bip39.html / password.html):
 // entry must be an object, hash = exactly 64 hex chars, dedupe.
 async function fetchLatestBlock() {
     const res = await fetch('https://api.nanexplorer.com/last-blocks?network=nano', { cache: 'no-store' });
