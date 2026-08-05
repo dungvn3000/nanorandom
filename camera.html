@@ -324,8 +324,11 @@ function startCapture() {
 function captureFrame() {
     if (!stream || !video.videoWidth) return;
 
-    canvas.width  = video.videoWidth;
-    canvas.height = video.videoHeight;
+    // Only resize canvas if video dimensions changed (avoids 1.2 MB reset every frame)
+    if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+        canvas.width  = video.videoWidth;
+        canvas.height = video.videoHeight;
+    }
     ctx2d.drawImage(video, 0, 0);
 
     // Sample PIXELS_PER_FRAME pixels at CSPRNG-chosen positions
