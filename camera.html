@@ -341,10 +341,13 @@ function captureFrame() {
         const idx = (py * W + px) * 4;
         sample.push(imgData[idx], imgData[idx + 1], imgData[idx + 2]); // R, G, B
     }
-    // Rolling buffer — keep appending, capped at MAX_ENTROPY_BYTES
-    if (capturedBytes.length < MAX_ENTROPY_BYTES) {
-        capturedBytes.push(...sample);
+    // Sliding window buffer — always keep the LATEST camera data.
+    // When full, drop oldest bytes equal to the new sample size so the
+    // buffer reflects current frames, not frames from 64s ago.
+    if (capturedBytes.length + sample.length > MAX_ENTROPY_BYTES) {
+        capturedBytes.splice(0, sample.length);
     }
+    capturedBytes.push(...sample);
     frames++;
 
     // Progress bar fills to 100% at FRAMES_NEEDED then stays full
