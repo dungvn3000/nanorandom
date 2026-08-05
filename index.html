@@ -357,13 +357,10 @@ section + section { border-top: 1px solid var(--border); }
   display: flex; flex-direction: column;
   transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
   position: relative; overflow: hidden;
-}
-.tool-card::after {
-  content: '';
-  position: absolute; inset: 0;
-  border-radius: var(--r);
-  opacity: 0;
-  transition: opacity 0.2s;
+  /* anchor reset */
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
 }
 .tool-card:hover { transform: translateY(-3px); }
 .tool-card.tc-green { --tc: var(--green); }
@@ -384,8 +381,9 @@ section + section { border-top: 1px solid var(--border); }
   display: inline-flex; align-items: center; gap: 6px;
   margin-top: 20px; font-size: 0.82em; font-weight: 600;
   color: var(--tc);
+  transition: gap 0.15s;
 }
-.tool-card .tc-link:hover { gap: 10px; }
+.tool-card:hover .tc-link { gap: 10px; }
 
 /* ── Security section ─────────────────────────────────────────── */
 .security-two {
@@ -750,37 +748,37 @@ footer a:hover { color: var(--txt); }
          locally, and use it with zero network access if you prefer.</p>
     </div>
     <div class="tools-grid">
-      <div class="tool-card tc-green">
+      <a class="tool-card tc-green" href="bip39.html">
         <div class="tc-top">&#x1F331;</div>
         <h3>BIP39 Seed Phrase Generator</h3>
         <p>Generates 12, 15, 18 or 24-word BIP39 mnemonic seed phrases.
            Optional user salt. Optional blockhash mixing. Valid checksum guaranteed.</p>
-        <a class="tc-link" href="bip39.html">Open generator &#x2192;</a>
-      </div>
-      <div class="tool-card tc-cyan">
+        <span class="tc-link">Open generator &#x2192;</span>
+      </a>
+      <a class="tool-card tc-cyan" href="password.html">
         <div class="tc-top">&#x1F511;</div>
         <h3>Password Generator</h3>
         <p>Configurable length (8&ndash;128 chars), character sets, and rejection
            sampling to eliminate modulo bias. Fisher-Yates shuffle guarantees
            every charset appears without leaking positional structure.</p>
-        <a class="tc-link" href="password.html">Open generator &#x2192;</a>
-      </div>
-      <div class="tool-card tc-teal">
+        <span class="tc-link">Open generator &#x2192;</span>
+      </a>
+      <a class="tool-card tc-teal" href="dice.html">
         <div class="tc-top">&#x1F3B2;</div>
         <h3>Live Dice Roller</h3>
         <p>Auto-rolls on every new Nano block. d4 through d100, up to 20 dice.
            Each roll seeded by SHA-256(CSPRNG salt&nbsp;||&nbsp;block hash)
            with rejection-sampling for zero modulo bias.</p>
-        <a class="tc-link" href="dice.html">Open roller &#x2192;</a>
-      </div>
-      <div class="tool-card tc-purple">
+        <span class="tc-link">Open roller &#x2192;</span>
+      </a>
+      <a class="tool-card tc-purple" href="matrix.html">
         <div class="tc-top">&#x1F7E9;</div>
         <h3>Nano Matrix Rain</h3>
         <p>Visualise live Nano blockhashes as a Matrix-style hex rain.
            Every character on screen is a real hex digit from a real block.
            New blocks trigger a burst flash injection.</p>
-        <a class="tc-link" href="matrix.html">Open visualiser &#x2192;</a>
-      </div>
+        <span class="tc-link">Open visualiser &#x2192;</span>
+      </a>
     </div>
   </div>
 </section>
