@@ -137,7 +137,7 @@
             <option value="18">18 words</option>
             <option value="24">24 words</option>
         </select>
-        <button id="btnGen" type="button" disabled>Generate Seed</button>
+
         <button id="btnCopy" class="eyebtn" type="button">Copy</button>
     </div>
 
@@ -226,7 +226,7 @@ const errEl      = document.getElementById('err');
 const entHex     = document.getElementById('entHex');
 const entSrc     = document.getElementById('entSrc');
 const btnCam     = document.getElementById('btnCam');
-const btnGen     = document.getElementById('btnGen');
+
 const btnCopy    = document.getElementById('btnCopy');
 const wcSel      = document.getElementById('wcSel');
 
@@ -278,7 +278,7 @@ function startCapture() {
     progFill.style.width   = '0%';
     frameCount.textContent = '0 / ' + FRAMES_NEEDED + ' frames';
     frameLog.textContent   = '\u00a0';
-    btnGen.disabled        = true;
+
     scanOverlay.classList.add('active');
     captureTimer = setInterval(captureFrame, 180);
 }
@@ -324,7 +324,7 @@ function captureFrame() {
 }
 
 // ─── Generate ─────────────────────────────────────────────────────────────────
-btnGen.addEventListener('click', generate);
+
 
 async function generate() {
     errEl.textContent = '';
@@ -337,7 +337,7 @@ async function generate() {
     if (!byteLen) { errEl.textContent = 'Invalid word count.'; return; }
 
     try {
-        btnGen.disabled = true;
+
 
         // 1. CSPRNG salt
         const salt = new Uint8Array(32);
@@ -374,8 +374,7 @@ async function generate() {
         statusText.textContent = '\u26a0 Generation failed';
         lastWords = [];
     } finally {
-        btnGen.textContent = 'Re-generate';
-        btnGen.disabled    = false;
+
     }
 }
 
