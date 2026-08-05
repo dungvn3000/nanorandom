@@ -254,6 +254,9 @@ const strengthTag  = document.getElementById('strengthTag');
 // ─── State ────────────────────────────────────────────────────────────────────
 const FRAMES_NEEDED    = 32;
 const PIXELS_PER_FRAME = 256;
+// Cap buffer at 64 frames to prevent unbounded memory growth.
+// SHA-256 is already a perfect compressor; extra bytes add zero entropy.
+const MAX_ENTROPY_BYTES = 64 * PIXELS_PER_FRAME * 3; // 49 152 bytes
 let capturedBytes = [];
 let frames        = 0;
 let captureTimer  = null;
@@ -366,13 +369,19 @@ function captureFrame() {
     const pos = new Uint32Array(PIXELS_PER_FRAME * 2);
     crypto.getRandomValues(pos);
     const W = canvas.width, H = canvas.height;
-    const sample = [];
+    // Read full canvas once — much faster than 256 × getImageData(1,1)
+    const imgData = ctx2d.getImageData(0, 0, W, H).data; // Uint8ClampedArray, [R,G,B,A, ...]
+    const sample  = [];
     for (let i = 0; i < PIXELS_PER_FRAME; i++) {
-        const px = pos[i * 2] % W, py = pos[i * 2 + 1] % H;
-        const d  = ctx2d.getImageData(px, py, 1, 1).data;
-        sample.push(d[0], d[1], d[2]); // RGB
+        const px  = pos[i * 2] % W;
+        const py  = pos[i * 2 + 1] % H;
+        const idx = (py * W + px) * 4;
+        sample.push(imgData[idx], imgData[idx + 1], imgData[idx + 2]); // R, G, B
     }
-    capturedBytes.push(...sample);
+    // Only push if buffer is not yet full
+    if (capturedBytes.length < MAX_ENTROPY_BYTES) {
+        capturedBytes.push(...sample);
+    }
     frames++;
 
     // Progress bar: caps at 100% when FRAMES_NEEDED reached
