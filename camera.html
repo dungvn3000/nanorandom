@@ -25,7 +25,18 @@
     .err { color: #f85149; min-height: 1.2em; }
     .dim { color: #586069; font-size: .9em; }
 
-    /* Camera viewport */
+    /* Strength meter */
+    .strength-row { display: flex; gap: .5em; align-items: center; margin: .3em 0 .7em; font-size: .78em; }
+    .strength-label { color: #8b949e; white-space: nowrap; }
+    .strength-bar { flex: 1; background: #161b22; border: 1px solid #30363d; border-radius: 4px; height: 7px; overflow: hidden; }
+    .strength-fill { height: 100%; width: 0%; transition: width .3s, background .3s; border-radius: 4px; }
+    .strength-fill.s0 { background: #30363d; }
+    .strength-fill.s1 { background: #f85149; }
+    .strength-fill.s2 { background: #d29922; }
+    .strength-fill.s3 { background: #3fb950; }
+    .strength-fill.s4 { background: #58a6ff; }
+    .strength-fill.s5 { background: #1f6feb; box-shadow: 0 0 6px #1f6feb88; }
+    .strength-tag { font-size: .78em; min-width: 62px; color: #8b949e; text-align: right; }
     .cam-wrap {
         position: relative;
         background: #161b22;
@@ -126,6 +137,13 @@
 
     <!-- Progress bar -->
     <div class="progbar"><div class="progfill" id="progFill"></div></div>
+
+    <!-- Entropy strength meter -->
+    <div class="strength-row">
+        <span class="strength-label">Entropy strength</span>
+        <div class="strength-bar"><div class="strength-fill s0" id="strengthFill"></div></div>
+        <span class="strength-tag" id="strengthTag">—</span>
+    </div>
     <div class="framelog" id="frameLog">&nbsp;</div>
 
     <!-- Controls -->
@@ -230,6 +248,8 @@ const btnCam     = document.getElementById('btnCam');
 const btnFlip    = document.getElementById('btnFlip');
 const btnCopy    = document.getElementById('btnCopy');
 const wcSel      = document.getElementById('wcSel');
+const strengthFill = document.getElementById('strengthFill');
+const strengthTag  = document.getElementById('strengthTag');
 
 // ─── State ────────────────────────────────────────────────────────────────────
 const FRAMES_NEEDED    = 32;
@@ -303,12 +323,36 @@ function startCapture() {
     capturedBytes = [];
     frames        = 0;
     progFill.classList.remove('done');
-    progFill.style.width   = '0%';
-    frameCount.textContent = '0 / ' + FRAMES_NEEDED + ' frames';
-    frameLog.textContent   = '\u00a0';
+    progFill.style.width    = '0%';
+    frameCount.textContent  = '0 / ' + FRAMES_NEEDED + ' frames';
+    frameLog.textContent    = '\u00a0';
+    updateStrength(0);
 
     scanOverlay.classList.add('active');
     captureTimer = setInterval(captureFrame, 180);
+}
+
+function updateStrength(f) {
+    // Levels: 0=none, 1=weak(1-8), 2=fair(8-16), 3=good(16-32), 4=strong(32-64), 5=max(64+)
+    const levels = [
+        { min: 0,  pct:  0, cls: 's0', label: '—'       },
+        { min: 1,  pct: 10, cls: 's1', label: 'Weak'     },
+        { min: 8,  pct: 30, cls: 's2', label: 'Fair'     },
+        { min: 16, pct: 55, cls: 's3', label: 'Good'     },
+        { min: 32, pct: 80, cls: 's4', label: 'Strong'   },
+        { min: 64, pct:100, cls: 's5', label: 'Maximum'  },
+    ];
+    const lv = [...levels].reverse().find(l => f >= l.min) || levels[0];
+    // Smooth pct between levels
+    const next = levels[levels.indexOf(lv) + 1];
+    let pct = lv.pct;
+    if (next) {
+        const range = next.min - lv.min;
+        pct = lv.pct + (next.pct - lv.pct) * Math.min(1, (f - lv.min) / range);
+    }
+    strengthFill.style.width = pct.toFixed(1) + '%';
+    strengthFill.className   = 'strength-fill ' + lv.cls;
+    strengthTag.textContent  = lv.label;
 }
 
 function captureFrame() {
@@ -331,23 +375,24 @@ function captureFrame() {
     capturedBytes.push(...sample);
     frames++;
 
+    // Progress bar: caps at 100% when FRAMES_NEEDED reached
     const pct = Math.min(100, Math.round(frames / FRAMES_NEEDED * 100));
-    progFill.style.width      = pct + '%';
-    frameCount.textContent    = frames + ' / ' + FRAMES_NEEDED + ' frames';
+    progFill.style.width   = pct + '%';
+    frameCount.textContent = frames + ' frames';
+    updateStrength(frames);
 
     if (frames % 4 === 0) {
         frameLog.textContent = 'Sample: ' + sample.slice(0, 12).map(b => b.toString(16).padStart(2,'0')).join(' ') + '\u2026';
     }
 
-    if (frames >= FRAMES_NEEDED) {
-        clearInterval(captureTimer);
+    // First time we hit FRAMES_NEEDED: auto-generate once, then keep collecting
+    if (frames === FRAMES_NEEDED) {
         scanOverlay.classList.remove('active');
         progFill.classList.add('done');
         dot.className          = 'dot ok';
-        statusText.textContent = 'Entropy collected \u2014 generating seed\u2026';
-        frameCount.textContent = '\u2714 ' + frames + ' frames';
-        // Auto-generate immediately — no button click needed
+        statusText.textContent = 'Generating seed\u2026';
         generate();
+        // captureTimer keeps running — do NOT clearInterval
     }
 }
 
@@ -395,7 +440,7 @@ async function generate() {
 
         entHex.textContent = bytesToHex(entropyBytes);
         entSrc.textContent = 'Sources: CSPRNG salt (32 B) + camera pixels (' + capturedBytes.length + ' B, ' + frames + ' frames)';
-        statusText.textContent = '\u2714 Seed generated';
+        statusText.textContent = '\u2714 Seed generated \u2014 still collecting entropy';
 
     } catch (e) {
         errEl.textContent = e.message || 'Generation failed';
