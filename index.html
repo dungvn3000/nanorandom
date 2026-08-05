@@ -501,12 +501,28 @@ footer a:hover { color: var(--txt); }
       </div>
       <div class="problem-card">
         <div class="problem-icon">&#x1F4B8;</div>
-        <h3>Hardware RNG devices</h3>
+        <h3>Hardware RNG devices are expensive</h3>
         <p>
           True random number generators (HSMs, YubiKeys, Ledger, dedicated
           TRNG boards) provide excellent physical entropy&nbsp;&mdash; but
           they cost money, require drivers, and are not available to most
           people when they need to generate a wallet today.
+        </p>
+      </div>
+      <div class="problem-card">
+        <div class="problem-icon">&#x1F9B0;</div>
+        <h3>Hardware RNG can still be buggy or backdoored</h3>
+        <p>
+          Even certified hardware is not immune. The <strong>Coldcard Mk1&ndash;Mk3</strong>
+          hardware wallet used an <strong>ATECC508A</strong> secure-element chip whose
+          on-chip TRNG output was found to be potentially biased &mdash; Coldcard
+          responded by XOR-ing the chip&rsquo;s output with a software PRNG as a
+          defensive measure. The <strong>Intel RDRAND</strong> instruction shipped a
+          bug (fixed in 2019) that made it return <code>0xFFFFFFFF</code> on certain
+          CPUs. The NSA&rsquo;s <strong>Dual_EC_DRBG</strong> standard contained a
+          deliberate backdoor. Supply-chain attacks can replace a legitimate TRNG
+          chip with one that generates predictable output. <em>Hardware is not a
+          guarantee; diversity of sources is.</em>
         </p>
       </div>
       <div class="problem-card">
