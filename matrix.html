@@ -191,8 +191,8 @@ body::after {
   </div>
 
   <div id="controls">
-    <button class="ctrl" id="btnSpeed">Speed: Normal</button>
-    <button class="ctrl" id="btnTrail">Trail: Medium</button>
+    <button class="ctrl" id="btnSpeed">Speed: Slow</button>
+    <button class="ctrl" id="btnTrail">Trail: Ghost</button>
     <button class="ctrl" id="btnPause">&#9646;&#9646; Pause</button>
   </div>
 
@@ -213,7 +213,7 @@ const FS     = 14;
 const HEX    = '0123456789ABCDEF'.split('');
 
 let COLS, drops, speeds, flashLeft, trailAlpha;
-trailAlpha = 0.048;
+trailAlpha = 0.012;
 
 function init() {
   canvas.width  = window.innerWidth;
@@ -282,7 +282,7 @@ const SPEED_PRESETS = ['Slow', 'Normal', 'Fast', 'Turbo'];
 const SPEED_VALS    = [0.45, 1.0, 1.9, 3.8];
 const TRAIL_PRESETS = ['Short', 'Medium', 'Long', 'Ghost'];
 const TRAIL_VALS    = [0.09, 0.048, 0.025, 0.012];
-let speedIdx = 1, trailIdx = 1;
+let speedIdx = 0, trailIdx = 3;
 
 // Draw loop
 function draw() {
