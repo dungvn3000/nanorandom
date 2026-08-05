@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Generate a BIP39 seed phrase by pointing your camera at the Nano Matrix rain — capturing blockchain data and physical camera sensor noise as entropy.">
+<title>NanoRandom — Camera Entropy BIP39 Generator</title>
+<style>
+:root { color-scheme: dark; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #06090b;
+  color: #d4e8f0;
+  font-family: ui-monospace, 'Courier New', monospace;
+  min-height: 100vh;
+  padding: 0 0 40px;
+}
+
+/* Nav */
+nav {
+  border-bottom: 1px solid #1c2a35;
+  padding: 13px 24px;
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(6,9,11,0.9);
+  position: sticky; top: 0; z-index: 50;
+}
+.logo { color: #00e676; font-weight: 700; margin-right: auto; font-size: 0.9em; text-shadow: 0 0 10px #00e67660; }
+.nav-a { color: #4a7a8a; font-size: 0.78em; text-decoration: none; }
+.nav-a:hover { color: #d4e8f0; }
+
+/* Layout */
+.wrap { max-width: 960px; margin: 0 auto; padding: 36px 20px 0; }
+h1 { font-size: 1.1em; color: #fff; margin-bottom: 4px; }
+.subtitle { font-size: 0.78em; color: #4a7a8a; margin-bottom: 28px; line-height: 1.6; }
+.subtitle b { color: #00e676; }
+
+/* Two-column layout */
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+@media (max-width: 680px) { .cols { grid-template-columns: 1fr; } }
+
+/* Camera panel */
+.cam-panel {
+  background: #0c1217;
+  border: 1px solid #1c2a35;
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+}
+.cam-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid #1c2a35;
+  font-size: 0.75em;
+  color: #4a7a8a;
+  display: flex; align-items: center; gap: 8px;
+}
+.cam-header .dot { width: 8px; height: 8px; border-radius: 50%; background: #00e676; box-shadow: 0 0 6px #00e676; animation: pulse 1.4s infinite; }
+.cam-header .dot.off { background: #223; box-shadow: none; animation: none; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.2} }
+
+.cam-viewport {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4/3;
+  background: #000;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+#video {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+  transform: scaleX(-1); /* mirror */
+}
+#captureCanvas { display: none; }
+
+/* Scan overlay */
+.scan-overlay {
+  position: absolute; inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.scan-overlay.active { opacity: 1; }
+.scan-line {
+  position: absolute;
+  left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #00e676, #00e5ff, #00e676, transparent);
+  box-shadow: 0 0 8px #00e676, 0 0 20px #00e5ff;
+  animation: scanMove 1.2s linear infinite;
+}
+@keyframes scanMove {
+  0%   { top: -2px; opacity: 0; }
+  5%   { opacity: 1; }
+  95%  { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+/* Corner brackets */
+.scan-overlay::before, .scan-overlay::after {
+  content: '';
+  position: absolute;
+  width: 24px; height: 24px;
+  border-color: #00e676;
+  border-style: solid;
+  opacity: 0.7;
+}
+.scan-overlay::before { top: 12px; left: 12px; border-width: 2px 0 0 2px; }
+.scan-overlay::after  { bottom: 12px; right: 12px; border-width: 0 2px 2px 0; }
+
+.cam-placeholder {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  color: #2a4a5a;
+  font-size: 0.8em;
+  gap: 10px;
+  text-align: center;
+  padding: 20px;
+}
+.cam-placeholder .icon { font-size: 2.5em; }
+
+/* Progress bar */
+.progress-wrap { padding: 14px 16px 10px; }
+.progress-label {
+  display: flex; justify-content: space-between;
+  font-size: 0.72em; color: #4a7a8a; margin-bottom: 6px;
+}
+.progress-label span { color: #00e676; }
+.progress-bar {
+  width: 100%; height: 6px;
+  background: #111820;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #00e676, #00e5ff);
+  border-radius: 4px;
+  width: 0%;
+  transition: width 0.2s;
+  box-shadow: 0 0 8px #00e67660;
+}
+.frame-log {
+  font-size: 0.68em;
+  color: #2a4a5a;
+  padding: 6px 16px 12px;
+  min-height: 1.4em;
+  word-break: break-all;
+  line-height: 1.5;
+}
+
+/* Controls */
+.ctrl-row {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  padding: 0 16px 14px;
+  align-items: center;
+}
+select, button {
+  background: #111820;
+  color: #d4e8f0;
+  border: 1px solid #1c2a35;
+  border-radius: 6px;
+  padding: 7px 12px;
+  font: inherit;
+  font-size: 0.8em;
+  cursor: pointer;
+}
+button.primary {
+  background: #00e676;
+  color: #06090b;
+  border-color: #00e676;
+  font-weight: 700;
+}
+button.primary:hover  { background: #1de9b6; border-color: #1de9b6; }
+button.primary:disabled { opacity: .45; cursor: default; }
+button.secondary { color: #7a9aaa; }
+button.secondary:hover { color: #d4e8f0; border-color: #2a4a5a; }
+
+/* Right panel — result */
+.result-panel {
+  background: #0c1217;
+  border: 1px solid #1c2a35;
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.result-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid #1c2a35;
+  font-size: 0.75em; color: #4a7a8a;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.result-body { padding: 16px; flex: 1; }
+
+/* Word grid */
+.word-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 7px;
+  min-height: 200px;
+}
+.word-cell {
+  background: #111820;
+  border: 1px solid #1c2a35;
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 0.82em;
+  display: flex; align-items: center; gap: 6px;
+  animation: popIn 0.25s ease-out;
+}
+@keyframes popIn {
+  from { transform: scale(0.7); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+.word-cell .num { color: #2a4a5a; font-size: 0.85em; min-width: 20px; }
+.word-cell .word { color: #d4e8f0; }
+
+.placeholder-words {
+  display: flex; align-items: center; justify-content: center;
+  height: 200px; color: #1a3040; font-size: 0.82em; text-align: center;
+  line-height: 1.6;
+}
+
+/* Entropy info */
+.entropy-info {
+  margin-top: 12px;
+  background: #080d10;
+  border: 1px solid #1c2a35;
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 0.7em;
+  color: #2a5060;
+  line-height: 1.7;
+  word-break: break-all;
+}
+.entropy-info b { color: #4a7a8a; }
+
+/* Error */
+.err { color: #ff5252; font-size: 0.8em; padding: 8px 16px; min-height: 1.4em; }
+
+/* How it works note */
+.how-note {
+  margin-top: 24px;
+  background: #0c1217;
+  border: 1px solid #1c2a35;
+  border-radius: 10px;
+  padding: 20px 22px;
+  font-size: 0.78em;
+  color: #4a7a8a;
+  line-height: 1.75;
+}
+.how-note h3 { color: #7aaabb; font-size: 1em; margin-bottom: 10px; }
+.how-note code {
+  background: #080d10;
+  border: 1px solid #1c2a35;
+  border-radius: 4px;
+  padding: 1px 6px;
+  color: #00e676;
+  font-size: 0.95em;
+}
+.how-note .formula {
+  background: #080d10;
+  border: 1px solid #1c2a35;
+  border-radius: 6px;
+  padding: 12px 14px;
+  margin: 10px 0;
+  line-height: 2;
+  color: #4a8a6a;
+}
+.how-note .formula .g  { color: #00e676; }
+.how-note .formula .cy { color: #00e5ff; }
+.how-note .formula .tl { color: #1de9b6; }
+.how-note .formula .c  { color: #2a4a5a; }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="logo">&#x2B21; NanoRandom</span>
+  <a class="nav-a" href="index.html">&larr; Home</a>
+  <a class="nav-a" href="bip39.html">BIP39</a>
+  <a class="nav-a" href="matrix.html">Matrix Rain</a>
+  <a class="nav-a" href="password.html">Password</a>
+  <a class="nav-a" href="dice.html">Dice</a>
+</nav>
+
+<div class="wrap">
+  <h1>Camera Entropy &mdash; BIP39 Seed Generator</h1>
+  <p class="subtitle">
+    Point your camera at the <a href="matrix.html" style="color:#00e676">Nano Matrix Rain</a>
+    to capture <b>live blockchain data</b> + <b>physical camera sensor noise</b> as entropy.
+    Combined with your browser&rsquo;s CSPRNG via SHA-256 &mdash; three independent sources,
+    zero hardware cost.
+  </p>
+
+  <div class="cols">
+    <!-- Camera panel -->
+    <div class="cam-panel">
+      <div class="cam-header">
+        <span class="dot off" id="camDot"></span>
+        <span id="camStatus">Camera not started</span>
+      </div>
+      <div class="cam-viewport">
+        <video id="video" autoplay playsinline muted></video>
+        <canvas id="captureCanvas"></canvas>
+        <div class="scan-overlay" id="scanOverlay">
+          <div class="scan-line"></div>
+        </div>
+        <div class="cam-placeholder" id="camPlaceholder">
+          <span class="icon">&#x1F4F7;</span>
+          <span>Click <b>Start Camera</b> below<br>then point at the Matrix Rain screen</span>
+        </div>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-label">
+          <span id="progressLabel">Entropy collected</span>
+          <span id="progressPct">0 / 32 frames</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+      </div>
+      <div class="frame-log" id="frameLog">&nbsp;</div>
+      <div class="ctrl-row">
+        <button class="secondary" id="btnCam">&#x1F4F7; Start Camera</button>
+        <select id="wcSel" aria-label="Word count">
+          <option value="12" selected>12 words</option>
+          <option value="15">15 words</option>
+          <option value="18">18 words</option>
+          <option value="24">24 words</option>
+        </select>
+        <button class="primary" id="btnGen" disabled>Generate Seed</button>
+      </div>
+      <div class="err" id="err"></div>
+    </div>
+
+    <!-- Result panel -->
+    <div class="result-panel">
+      <div class="result-header">
+        <span>BIP39 Seed Phrase</span>
+        <button class="secondary" id="btnCopy" style="padding:4px 10px;font-size:0.75em">Copy</button>
+      </div>
+      <div class="result-body">
+        <div class="word-grid" id="wordGrid">
+          <div class="placeholder-words">
+            Capture entropy from camera<br>then click Generate Seed
+          </div>
+        </div>
+        <div class="entropy-info" id="entropyInfo" style="display:none">
+          <b>Entropy hex:</b> <span id="entHex">&mdash;</span><br>
+          <b>Sources mixed:</b> <span id="entSources">&mdash;</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- How it works -->
+  <div class="how-note">
+    <h3>&#x1F50D; How camera entropy works</h3>
+    <div class="formula">
+<span class="c"># 1. Fresh CSPRNG salt (secret, never sent anywhere)</span>
+<span class="g">salt</span>     = crypto.getRandomValues(<span class="g">32 bytes</span>)
+
+<span class="c"># 2. Camera frames — sampled pixel bytes</span>
+<span class="cy">pixels</span>   = sample(<span class="cy">N frames</span> &times; <span class="cy">256 random pixels</span> &times; RGBA)
+<span class="c">           &#8627; physical sensor noise + screen content (blockchain chars if aimed at Matrix Rain)</span>
+
+<span class="c"># 3. Combine and hash</span>
+<span class="tl">entropy</span>  = SHA-256( <span class="g">salt</span> ++ <span class="cy">pixels</span> )[0 : ENT_bytes]
+<span class="tl">mnemonic</span> = BIP39( <span class="tl">entropy</span> )
+    </div>
+    <p>
+      The pixel sampling positions are chosen by the CSPRNG, so even a static image
+      cannot be replayed predictably. Camera sensor thermal noise adds physical
+      entropy invisible to any attacker. Pointing the camera at the
+      <a href="matrix.html" style="color:#00e676">Nano Matrix Rain</a>
+      adds a third layer: live blockchain hashes encoded as light.
+    </p>
+    <p style="margin-top:10px; color:#2a4050">
+      <b style="color:#3a6070">Security note:</b>
+      Camera access is processed entirely in your browser via
+      <code>getUserMedia</code> + <code>canvas.getImageData()</code>.
+      No frames are ever transmitted to any server.
+      Generated seeds are displayed in plaintext &mdash; use in a private location.
+    </p>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+// ─── BIP39 wordlist ────────────────────────────────────────────────────────────
+const WORDLIST = ["abandon","ability","able","about","above","absent","absorb","abstract","absurd","abuse","access","accident","account","accuse","achieve","acid","acoustic","acquire","across","act","action","actor","actress","actual","adapt","add","addict","address","adjust","admit","adult","advance","advice","aerobic","affair","afford","afraid","again","age","agent","agree","ahead","aim","air","airport","aisle","alarm","album","alcohol","alert","alien","all","alley","allow","almost","alone","alpha","already","also","alter","always","amateur","amazing","among","amount","amused","analyst","anchor","ancient","anger","angle","angry","animal","ankle","announce","annual","another","answer","antenna","antique","anxiety","any","apart","apology","appear","apple","approve","april","arch","arctic","area","arena","argue","arm","armed","armor","army","around","arrange","arrest","arrive","arrow","art","artefact","artist","artwork","ask","aspect","assault","asset","assist","assume","asthma","athlete","atom","attack","attend","attitude","attract","auction","audit","august","aunt","author","auto","autumn","average","avocado","avoid","awake","aware","away","awesome","awful","awkward","axis","baby","bachelor","bacon","badge","bag","balance","balcony","ball","bamboo","banana","banner","bar","barely","bargain","barrel","base","basic","basket","battle","beach","bean","beauty","because","become","beef","before","begin","behave","behind","believe","below","belt","bench","benefit","best","betray","better","between","beyond","bicycle","bid","bike","bind","biology","bird","birth","bitter","black","blade","blame","blanket","blast","bleak","bless","blind","blood","blossom","blouse","blue","blur","blush","board","boat","body","boil","bomb","bone","bonus","book","boost","border","boring","borrow","boss","bottom","bounce","box","boy","bracket","brain","brand","brass","brave","bread","breeze","brick","bridge","brief","bright","bring","brisk","broccoli","broken","bronze","broom","brother","brown","brush","bubble","buddy","budget","buffalo","build","bulb","bulk","bullet","bundle","bunker","burden","burger","burst","bus","business","busy","butter","buyer","buzz","cabbage","cabin","cable","cactus","cage","cake","call","calm","camera","camp","can","canal","cancel","candy","cannon","canoe","canvas","canyon","capable","capital","captain","car","carbon","card","cargo","carpet","carry","cart","case","cash","casino","castle","casual","cat","catalog","catch","category","cattle","caught","cause","caution","cave","ceiling","celery","cement","census","century","cereal","certain","chair","chalk","champion","change","chaos","chapter","charge","chase","chat","cheap","check","cheese","chef","cherry","chest","chicken","chief","child","chimney","choice","choose","chronic","chuckle","chunk","churn","cigar","cinnamon","circle","citizen","city","civil","claim","clap","clarify","claw","clay","clean","clerk","clever","click","client","cliff","climb","clinic","clip","clock","clog","close","cloth","cloud","clown","club","clump","cluster","clutch","coach","coast","coconut","code","coffee","coil","coin","collect","color","column","combine","come","comfort","comic","common","company","concert","conduct","confirm","congress","connect","consider","control","convince","cook","cool","copper","copy","coral","core","corn","correct","cost","cotton","couch","country","couple","course","cousin","cover","coyote","crack","cradle","craft","cram","crane","crash","crater","crawl","crazy","cream","credit","creek","crew","cricket","crime","crisp","critic","crop","cross","crouch","crowd","crucial","cruel","cruise","crumble","crunch","crush","cry","crystal","cube","culture","cup","cupboard","curious","current","curtain","curve","cushion","custom","cute","cycle","dad","damage","damp","dance","danger","daring","dash","daughter","dawn","day","deal","debate","debris","decade","december","decide","decline","decorate","decrease","deer","defense","define","defy","degree","delay","deliver","demand","demise","denial","dentist","deny","depart","depend","deposit","depth","deputy","derive","describe","desert","design","desk","despair","destroy","detail","detect","develop","device","devote","diagram","dial","diamond","diary","dice","diesel","diet","differ","digital","dignity","dilemma","dinner","dinosaur","direct","dirt","disagree","discover","disease","dish","dismiss","disorder","display","distance","divert","divide","divorce","dizzy","doctor","document","dog","doll","dolphin","domain","donate","donkey","donor","door","dose","double","dove","draft","dragon","drama","drastic","draw","dream","dress","drift","drill","drink","drip","drive","drop","drum","dry","duck","dumb","dune","during","dust","dutch","duty","dwarf","dynamic","eager","eagle","early","earn","earth","easily","east","easy","echo","ecology","economy","edge","edit","educate","effort","egg","eight","either","elbow","elder","electric","elegant","element","elephant","elevator","elite","else","embark","embody","embrace","emerge","emotion","employ","empower","empty","enable","enact","end","endless","endorse","enemy","energy","enforce","engage","engine","enhance","enjoy","enlist","enough","enrich","enroll","ensure","enter","entire","entry","envelope","episode","equal","equip","era","erase","erode","erosion","error","erupt","escape","essay","essence","estate","eternal","ethics","evidence","evil","evoke","evolve","exact","example","excess","exchange","excite","exclude","excuse","execute","exercise","exhaust","exhibit","exile","exist","exit","exotic","expand","expect","expire","explain","expose","express","extend","extra","eye","eyebrow","fabric","face","faculty","fade","faint","faith","fall","false","fame","family","famous","fan","fancy","fantasy","farm","fashion","fat","fatal","father","fatigue","fault","favorite","feature","february","federal","fee","feed","feel","female","fence","festival","fetch","fever","few","fiber","fiction","field","figure","file","film","filter","final","find","fine","finger","finish","fire","firm","first","fiscal","fish","fit","fitness","fix","flag","flame","flash","flat","flavor","flee","flight","flip","float","flock","floor","flower","fluid","flush","fly","foam","focus","fog","foil","fold","follow","food","foot","force","forest","forget","fork","fortune","forum","forward","fossil","foster","found","fox","fragile","frame","frequent","fresh","friend","fringe","frog","front","frost","frown","frozen","fruit","fuel","fun","funny","furnace","fury","future","gadget","gain","galaxy","gallery","game","gap","garage","garbage","garden","garlic","garment","gas","gasp","gate","gather","gauge","gaze","general","genius","genre","gentle","genuine","gesture","ghost","giant","gift","giggle","ginger","giraffe","girl","give","glad","glance","glare","glass","glide","glimpse","globe","gloom","glory","glove","glow","glue","goat","goddess","gold","good","goose","gorilla","gospel","gossip","govern","gown","grab","grace","grain","grant","grape","grass","gravity","great","green","grid","grief","grit","grocery","group","grow","grunt","guard","guess","guide","guilt","guitar","gun","gym","habit","hair","half","hammer","hamster","hand","happy","harbor","hard","harsh","harvest","hat","have","hawk","hazard","head","health","heart","heavy","hedgehog","height","hello","helmet","help","hen","hero","hidden","high","hill","hint","hip","hire","history","hobby","hockey","hold","hole","holiday","hollow","home","honey","hood","hope","horn","horror","horse","hospital","host","hotel","hour","hover","hub","huge","human","humble","humor","hundred","hungry","hunt","hurdle","hurry","hurt","husband","hybrid","ice","icon","idea","identify","idle","ignore","ill","illegal","illness","image","imitate","immense","immune","impact","impose","improve","impulse","inch","include","income","increase","index","indicate","indoor","industry","infant","inflict","inform","inhale","inherit","initial","inject","injury","inmate","inner","innocent","input","inquiry","insane","insect","inside","inspire","install","intact","interest","into","invest","invite","involve","iron","island","isolate","issue","item","ivory","jacket","jaguar","jar","jazz","jealous","jeans","jelly","jewel","job","join","joke","journey","joy","judge","juice","jump","jungle","junior","junk","just","kangaroo","keen","keep","ketchup","key","kick","kid","kidney","kind","kingdom","kiss","kit","kitchen","kite","kitten","kiwi","knee","knife","knock","know","lab","label","labor","ladder","lady","lake","lamp","language","laptop","large","later","latin","laugh","laundry","lava","law","lawn","lawsuit","layer","lazy","leader","leaf","learn","leave","lecture","left","leg","legal","legend","leisure","lemon","lend","length","lens","leopard","lesson","letter","level","liar","liberty","library","license","life","lift","light","like","limb","limit","link","lion","liquid","list","little","live","lizard","load","loan","lobster","local","lock","logic","lonely","long","loop","lottery","loud","lounge","love","loyal","lucky","luggage","lumber","lunar","lunch","luxury","lyrics","machine","mad","magic","magnet","maid","mail","main","major","make","mammal","man","manage","mandate","mango","mansion","manual","maple","marble","march","margin","marine","market","marriage","mask","mass","master","match","material","math","matrix","matter","maximum","maze","meadow","mean","measure","meat","mechanic","medal","media","melody","melt","member","memory","mention","menu","mercy","merge","merit","merry","mesh","message","metal","method","middle","midnight","milk","million","mimic","mind","minimum","minor","minute","miracle","mirror","misery","miss","mistake","mix","mixed","mixture","mobile","model","modify","mom","moment","monitor","monkey","monster","month","moon","moral","more","morning","mosquito","mother","motion","motor","mountain","mouse","move","movie","much","muffin","mule","multiply","muscle","museum","mushroom","music","must","mutual","myself","mystery","myth","naive","name","napkin","narrow","nasty","nation","nature","near","neck","need","negative","neglect","neither","nephew","nerve","nest","net","network","neutral","never","news","next","nice","night","noble","noise","nominee","noodle","normal","north","nose","notable","note","nothing","notice","novel","now","nuclear","number","nurse","nut","oak","obey","object","oblige","obscure","observe","obtain","obvious","occur","ocean","october","odor","off","offer","office","often","oil","okay","old","olive","olympic","omit","once","one","onion","online","only","open","opera","opinion","oppose","option","orange","orbit","orchard","order","ordinary","organ","orient","original","orphan","ostrich","other","outdoor","outer","output","outside","oval","oven","over","own","owner","oxygen","oyster","ozone","pact","paddle","page","pair","palace","palm","panda","panel","panic","panther","paper","parade","parent","park","parrot","party","pass","patch","path","patient","patrol","pattern","pause","pave","payment","peace","peanut","pear","peasant","pelican","pen","penalty","pencil","people","pepper","perfect","permit","person","pet","phone","photo","phrase","physical","piano","picnic","picture","piece","pig","pigeon","pill","pilot","pink","pioneer","pipe","pistol","pitch","pizza","place","planet","plastic","plate","play","please","pledge","pluck","plug","plunge","poem","poet","point","polar","pole","police","pond","pony","pool","popular","portion","position","possible","post","potato","pottery","poverty","powder","power","practice","praise","predict","prefer","prepare","present","pretty","prevent","price","pride","primary","print","priority","prison","private","prize","problem","process","produce","profit","program","project","promote","proof","property","prosper","protect","proud","provide","public","pudding","pull","pulp","pulse","pumpkin","punch","pupil","puppy","purchase","purity","purpose","purse","push","put","puzzle","pyramid","quality","quantum","quarter","question","quick","quit","quiz","quote","rabbit","raccoon","race","rack","radar","radio","rail","rain","raise","rally","ramp","ranch","random","range","rapid","rare","rate","rather","raven","raw","razor","ready","real","reason","rebel","rebuild","recall","receive","recipe","record","recycle","reduce","reflect","reform","refuse","region","regret","regular","reject","relax","release","relief","rely","remain","remember","remind","remove","render","renew","rent","reopen","repair","repeat","replace","report","require","rescue","resemble","resist","resource","response","result","retire","retreat","return","reunion","reveal","review","reward","rhythm","rib","ribbon","rice","rich","ride","ridge","rifle","right","rigid","ring","riot","ripple","risk","ritual","rival","river","road","roast","robot","robust","rocket","romance","roof","rookie","room","rose","rotate","rough","round","route","royal","rubber","rude","rug","rule","run","runway","rural","sad","saddle","sadness","safe","sail","salad","salmon","salon","salt","salute","same","sample","sand","satisfy","satoshi","sauce","sausage","save","say","scale","scan","scare","scatter","scene","scheme","school","science","scissors","scorpion","scout","scrap","screen","script","scrub","sea","search","season","seat","second","secret","section","security","seed","seek","segment","select","sell","seminar","senior","sense","sentence","series","service","session","settle","setup","seven","shadow","shaft","shallow","share","shed","shell","sheriff","shield","shift","shine","ship","shiver","shock","shoe","shoot","shop","short","shoulder","shove","shrimp","shrug","shuffle","shy","sibling","sick","side","siege","sight","sign","silent","silk","silly","silver","similar","simple","since","sing","siren","sister","situate","six","size","skate","sketch","ski","skill","skin","skirt","skull","slab","slam","sleep","slender","slice","slide","slight","slim","slogan","slot","slow","slush","small","smart","smile","smoke","smooth","snack","snake","snap","sniff","snow","soap","soccer","social","sock","soda","soft","solar","soldier","solid","solution","solve","someone","song","soon","sorry","sort","soul","sound","soup","source","south","space","spare","spatial","spawn","speak","special","speed","spell","spend","sphere","spice","spider","spike","spin","spirit","split","spoil","sponsor","spoon","sport","spot","spray","spread","spring","spy","square","squeeze","squirrel","stable","stadium","staff","stage","stairs","stamp","stand","start","state","stay","steak","steel","stem","step","stereo","stick","still","sting","stock","stomach","stone","stool","story","stove","strategy","street","strike","strong","struggle","student","stuff","stumble","style","subject","submit","subway","success","such","sudden","suffer","sugar","suggest","suit","summer","sun","sunny","sunset","super","supply","supreme","sure","surface","surge","surprise","surround","survey","suspect","sustain","swallow","swamp","swap","swarm","swear","sweet","swift","swim","swing","switch","sword","symbol","symptom","syrup","system","table","tackle","tag","tail","talent","talk","tank","tape","target","task","taste","tattoo","taxi","teach","team","tell","ten","tenant","tennis","tent","term","test","text","thank","that","theme","then","theory","there","they","thing","this","thought","three","thrive","throw","thumb","thunder","ticket","tide","tiger","tilt","timber","time","tiny","tip","tired","tissue","title","toast","tobacco","today","toddler","toe","together","toilet","token","tomato","tomorrow","tone","tongue","tonight","tool","tooth","top","topic","topple","torch","tornado","tortoise","toss","total","tourist","toward","tower","town","toy","track","trade","traffic","tragic","train","transfer","trap","trash","travel","tray","treat","tree","trend","trial","tribe","trick","trigger","trim","trip","trophy","trouble","truck","true","truly","trumpet","trust","truth","try","tube","tuition","tumble","tuna","tunnel","turkey","turn","turtle","twelve","twenty","twice","twin","twist","two","type","typical","ugly","umbrella","unable","unaware","uncle","uncover","under","undo","unfair","unfold","unhappy","uniform","unique","unit","universe","unknown","unlock","until","unusual","unveil","update","upgrade","uphold","upon","upper","upset","urban","urge","usage","use","used","useful","useless","usual","utility","vacant","vacuum","vague","valid","valley","valve","van","vanish","vapor","various","vast","vault","vehicle","velvet","vendor","venture","venue","verb","verify","version","very","vessel","veteran","viable","vibrant","vicious","victory","video","view","village","vintage","violin","virtual","virus","visa","visit","visual","vital","vivid","vocal","voice","void","volcano","volume","vote","voyage","wage","wagon","wait","walk","wall","walnut","want","warfare","warm","warrior","wash","wasp","waste","water","wave","way","wealth","weapon","wear","weasel","weather","web","wedding","weekend","weird","welcome","west","wet","whale","what","wheat","wheel","when","where","whip","whisper","wide","width","wife","wild","will","win","window","wine","wing","wink","winner","winter","wire","wisdom","wise","wish","witness","wolf","woman","wonder","wood","wool","word","work","world","worry","worth","wrap","wreck","wrestle","wrist","write","wrong","yard","year","yellow","you","young","youth","zebra","zero","zone","zoo"];
+
+// ─── Crypto helpers ────────────────────────────────────────────────────────────
+async function sha256(bytes) {
+  const buf  = new Uint8Array(bytes).buffer;
+  const hash = await crypto.subtle.digest('SHA-256', buf);
+  return Array.from(new Uint8Array(hash));
+}
+
+function toBits(bytes) {
+  return bytes.map(b => b.toString(2).padStart(8, '0')).join('');
+}
+
+function bytesToHex(bytes) {
+  return bytes.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function entropyToMnemonic(entropyBytes) {
+  if (WORDLIST.length !== 2048) throw new Error('Invalid wordlist');
+  const allowed = new Set([16, 20, 24, 28, 32]);
+  if (!allowed.has(entropyBytes.length)) throw new Error('Invalid entropy length');
+  const checksumLen = entropyBytes.length / 4;
+  const hashBytes   = await sha256(entropyBytes);
+  const bits        = toBits(Array.from(entropyBytes)) + toBits(hashBytes).slice(0, checksumLen);
+  const words = [];
+  for (let i = 0; i < bits.length; i += 11) {
+    words.push(WORDLIST[parseInt(bits.slice(i, i + 11), 2)]);
+  }
+  return words;
+}
+
+// ─── DOM refs ──────────────────────────────────────────────────────────────────
+const video        = document.getElementById('video');
+const canvas       = document.getElementById('captureCanvas');
+const ctx2d        = canvas.getContext('2d', { willReadFrequently: true });
+const scanOverlay  = document.getElementById('scanOverlay');
+const camDot       = document.getElementById('camDot');
+const camStatus    = document.getElementById('camStatus');
+const camPH        = document.getElementById('camPlaceholder');
+const progressFill = document.getElementById('progressFill');
+const progressPct  = document.getElementById('progressPct');
+const frameLog     = document.getElementById('frameLog');
+const wordGrid     = document.getElementById('wordGrid');
+const errEl        = document.getElementById('err');
+const btnCam       = document.getElementById('btnCam');
+const btnGen       = document.getElementById('btnGen');
+const btnCopy      = document.getElementById('btnCopy');
+const wcSel        = document.getElementById('wcSel');
+const entropyInfo  = document.getElementById('entropyInfo');
+const entHex       = document.getElementById('entHex');
+const entSources   = document.getElementById('entSources');
+
+// ─── State ─────────────────────────────────────────────────────────────────────
+const FRAMES_NEEDED  = 32;   // number of frames to capture
+const PIXELS_PER_FRAME = 256; // random pixels sampled per frame
+let   capturedBytes  = [];
+let   frameCount     = 0;
+let   capturing      = false;
+let   captureTimer   = null;
+let   stream         = null;
+let   lastWords      = [];
+
+// ─── Camera ────────────────────────────────────────────────────────────────────
+btnCam.addEventListener('click', async () => {
+  if (stream) {
+    stopCamera();
+    return;
+  }
+  errEl.textContent = '';
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'environment' }
+    });
+    video.srcObject = stream;
+    camPH.style.display = 'none';
+    camDot.classList.remove('off');
+    camStatus.textContent = 'Camera active — collecting entropy';
+    btnCam.textContent = '\u23F9 Stop Camera';
+    startCapture();
+  } catch (e) {
+    errEl.textContent = 'Camera access denied: ' + e.message;
+  }
+});
+
+function stopCamera() {
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  clearInterval(captureTimer);
+  capturing = false;
+  video.srcObject = null;
+  camPH.style.display = '';
+  camDot.classList.add('off');
+  camStatus.textContent = 'Camera stopped';
+  btnCam.textContent = '\uD83D\uDCF7 Start Camera';
+  scanOverlay.classList.remove('active');
+}
+
+// ─── Frame capture ─────────────────────────────────────────────────────────────
+function startCapture() {
+  capturing = true;
+  scanOverlay.classList.add('active');
+  captureTimer = setInterval(captureFrame, 180); // ~5 fps
+}
+
+function captureFrame() {
+  if (!stream || !video.videoWidth) return;
+
+  // Draw current video frame to offscreen canvas
+  canvas.width  = video.videoWidth;
+  canvas.height = video.videoHeight;
+  ctx2d.drawImage(video, 0, 0);
+
+  // Sample PIXELS_PER_FRAME random pixel positions (positions chosen by CSPRNG)
+  const posArr = new Uint32Array(PIXELS_PER_FRAME * 2);
+  crypto.getRandomValues(posArr);
+
+  const W = canvas.width, H = canvas.height;
+  const frame = [];
+
+  for (let i = 0; i < PIXELS_PER_FRAME; i++) {
+    const px = posArr[i * 2]     % W;
+    const py = posArr[i * 2 + 1] % H;
+    const px4 = ctx2d.getImageData(px, py, 1, 1).data; // [R,G,B,A]
+    frame.push(px4[0], px4[1], px4[2]); // RGB only (A is always 255 for video)
+  }
+
+  capturedBytes.push(...frame);
+  frameCount++;
+
+  const pct = Math.min(100, Math.round(frameCount / FRAMES_NEEDED * 100));
+  progressFill.style.width = pct + '%';
+  progressPct.textContent  = frameCount + ' / ' + FRAMES_NEEDED + ' frames';
+
+  // Show a snippet of raw bytes as visual feedback
+  if (frameCount % 4 === 0) {
+    frameLog.textContent = 'Raw sample: ' + frame.slice(0, 12).map(b => b.toString(16).padStart(2, '0')).join(' ') + '\u2026';
+  }
+
+  if (frameCount >= FRAMES_NEEDED) {
+    clearInterval(captureTimer);
+    capturing = false;
+    scanOverlay.classList.remove('active');
+    camStatus.textContent = 'Entropy collected \u2014 ready to generate!';
+    camDot.style.animation = 'none';
+    camDot.style.background = '#1de9b6';
+    btnGen.disabled = false;
+    progressPct.textContent = '\u2714 ' + frameCount + ' frames captured';
+  }
+}
+
+// ─── Generate ──────────────────────────────────────────────────────────────────
+btnGen.addEventListener('click', generate);
+
+async function generate() {
+  errEl.textContent = '';
+  if (!capturedBytes.length) { errEl.textContent = 'No camera frames captured yet.'; return; }
+
+  // Fail closed
+  if (typeof crypto === 'undefined' || !crypto.getRandomValues || !crypto.subtle) {
+    errEl.textContent = 'Secure RNG unavailable — aborting.';
+    return;
+  }
+
+  const byteLen = { 12: 16, 15: 20, 18: 24, 24: 32 }[wcSel.value];
+  if (!byteLen) { errEl.textContent = 'Invalid word count.'; return; }
+
+  try {
+    btnGen.disabled = true;
+    btnGen.textContent = 'Generating\u2026';
+
+    // 1. CSPRNG salt — secret anchor
+    const salt = new Uint8Array(32);
+    crypto.getRandomValues(salt);
+
+    // 2. Combine: salt ++ all captured pixel bytes
+    const combined = Array.from(salt).concat(capturedBytes);
+
+    // 3. SHA-256 → truncate to needed entropy length
+    const hashBytes    = await sha256(combined);
+    const entropyBytes = hashBytes.slice(0, byteLen);
+
+    // 4. BIP39
+    const words = await entropyToMnemonic(entropyBytes);
+
+    // 5. Render
+    lastWords = words;
+    wordGrid.innerHTML = '';
+    words.forEach((w, i) => {
+      const cell = document.createElement('div');
+      cell.className = 'word-cell';
+      cell.style.animationDelay = (i * 30) + 'ms';
+      cell.innerHTML = `<span class="num">${i + 1}.</span><span class="word">${w}</span>`;
+      wordGrid.appendChild(cell);
+    });
+
+    // 6. Entropy info
+    entropyInfo.style.display  = '';
+    entHex.textContent         = bytesToHex(entropyBytes);
+    entSources.textContent     = `CSPRNG salt (32B) + camera pixels (${capturedBytes.length}B, ${frameCount} frames)`;
+
+  } catch (e) {
+    errEl.textContent = 'Generation failed: ' + (e.message || e);
+    lastWords = [];
+  } finally {
+    btnGen.disabled   = false;
+    btnGen.textContent = 'Generate Seed';
+  }
+}
+
+// ─── Copy ──────────────────────────────────────────────────────────────────────
+let copyTimer = null;
+btnCopy.addEventListener('click', async () => {
+  if (!lastWords.length) { errEl.textContent = 'Generate a seed phrase first.'; return; }
+  try {
+    await navigator.clipboard.writeText(lastWords.join(' '));
+    btnCopy.textContent = 'Copied!';
+    clearTimeout(copyTimer);
+    copyTimer = setTimeout(() => { btnCopy.textContent = 'Copy'; }, 1500);
+  } catch (e) {
+    errEl.textContent = 'Copy failed: ' + e.message;
+  }
+});
+</script>
+</body>
+</html>
