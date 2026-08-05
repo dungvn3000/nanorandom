@@ -131,6 +131,7 @@
     <!-- Controls -->
     <div class="row">
         <button id="btnCam" class="eyebtn" type="button">&#x1F4F7; Start Camera</button>
+        <button id="btnFlip" class="eyebtn" type="button" style="display:none">&#x1F504; Flip</button>
         <select id="wcSel" aria-label="Word count">
             <option value="12" selected>12 words</option>
             <option value="15">15 words</option>
@@ -226,7 +227,7 @@ const errEl      = document.getElementById('err');
 const entHex     = document.getElementById('entHex');
 const entSrc     = document.getElementById('entSrc');
 const btnCam     = document.getElementById('btnCam');
-
+const btnFlip    = document.getElementById('btnFlip');
 const btnCopy    = document.getElementById('btnCopy');
 const wcSel      = document.getElementById('wcSel');
 
@@ -238,19 +239,28 @@ let frames        = 0;
 let captureTimer  = null;
 let stream        = null;
 let lastWords     = [];
+let facingMode    = 'environment'; // 'environment' = rear, 'user' = front
+
+async function startStream() {
+    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode }
+    });
+    video.srcObject = stream;
+    // Mirror only for front camera
+    video.style.transform = facingMode === 'user' ? 'scaleX(-1)' : 'scaleX(1)';
+}
 
 // ─── Camera ──────────────────────────────────────────────────────────────────
 btnCam.addEventListener('click', async () => {
     if (stream) { stopCamera(); return; }
     errEl.textContent = '';
     try {
-        stream = await navigator.mediaDevices.getUserMedia({
-            video: { width: { ideal: 640 }, height: { ideal: 480 } }
-        });
-        video.srcObject = stream;
+        await startStream();
         camPh.style.display = 'none';
+        btnFlip.style.display = '';
         dot.className = 'dot wait';
-        statusText.textContent = 'Camera active — collecting entropy\u2026';
+        statusText.textContent = 'Camera active \u2014 collecting entropy\u2026';
         btnCam.textContent = 'Stop Camera';
         startCapture();
     } catch (e) {
@@ -258,11 +268,29 @@ btnCam.addEventListener('click', async () => {
     }
 });
 
+btnFlip.addEventListener('click', async () => {
+    if (!stream) return;
+    errEl.textContent = '';
+    facingMode = facingMode === 'environment' ? 'user' : 'environment';
+    const label = facingMode === 'environment' ? '&#x1F504; Flip (rear)' : '&#x1F504; Flip (front)';
+    btnFlip.textContent = '\u2b94 Switching\u2026';
+    try {
+        await startStream(); // restarts video stream only, entropy buffer untouched
+    } catch (e) {
+        // revert if device has no second camera
+        facingMode = facingMode === 'environment' ? 'user' : 'environment';
+        await startStream();
+        errEl.textContent = 'Cannot switch camera: ' + e.message;
+    }
+    btnFlip.textContent = '\u{1F504} Flip';
+});
+
 function stopCamera() {
     if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
     clearInterval(captureTimer);
     video.srcObject = null;
     camPh.style.display = '';
+    btnFlip.style.display = 'none';
     dot.className = 'dot idle';
     statusText.textContent = 'Camera stopped';
     btnCam.textContent = '\uD83D\uDCF7 Start Camera';
