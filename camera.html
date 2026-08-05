@@ -271,6 +271,14 @@ function stopCamera() {
 
 // ─── Frame capture ────────────────────────────────────────────────────────────
 function startCapture() {
+    // Reset entropy buffer so each Start gives fresh samples
+    capturedBytes = [];
+    frames        = 0;
+    progFill.classList.remove('done');
+    progFill.style.width   = '0%';
+    frameCount.textContent = '0 / ' + FRAMES_NEEDED + ' frames';
+    frameLog.textContent   = '\u00a0';
+    btnGen.disabled        = true;
     scanOverlay.classList.add('active');
     captureTimer = setInterval(captureFrame, 180);
 }
@@ -307,10 +315,11 @@ function captureFrame() {
         clearInterval(captureTimer);
         scanOverlay.classList.remove('active');
         progFill.classList.add('done');
-        dot.className   = 'dot ok';
-        statusText.textContent = '\u2714 Entropy collected \u2014 ready to generate';
+        dot.className          = 'dot ok';
+        statusText.textContent = 'Entropy collected \u2014 generating seed\u2026';
         frameCount.textContent = '\u2714 ' + frames + ' frames';
-        btnGen.disabled = false;
+        // Auto-generate immediately — no button click needed
+        generate();
     }
 }
 
@@ -358,12 +367,15 @@ async function generate() {
 
         entHex.textContent = bytesToHex(entropyBytes);
         entSrc.textContent = 'Sources: CSPRNG salt (32 B) + camera pixels (' + capturedBytes.length + ' B, ' + frames + ' frames)';
+        statusText.textContent = '\u2714 Seed generated';
 
     } catch (e) {
         errEl.textContent = e.message || 'Generation failed';
+        statusText.textContent = '\u26a0 Generation failed';
         lastWords = [];
     } finally {
-        btnGen.disabled = false;
+        btnGen.textContent = 'Re-generate';
+        btnGen.disabled    = false;
     }
 }
 
