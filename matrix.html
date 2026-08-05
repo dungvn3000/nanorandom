@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Matrix-style hex rain seeded by live Nano network blockhashes — every new block injects its 64 characters into the rain.">
+<title>NanoRandom — Nano Matrix Rain</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; height: 100%; background: #000; overflow: hidden; }
+canvas { display: block; position: fixed; top: 0; left: 0; }
+
+/* Scanline overlay */
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 2px,
+    rgba(0,0,0,0.08) 2px,
+    rgba(0,0,0,0.08) 4px
+  );
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* HUD layer */
+#hud {
+  position: fixed; inset: 0;
+  pointer-events: none;
+  z-index: 10;
+  font-family: ui-monospace, 'Courier New', monospace;
+}
+
+/* Title top-left */
+#title {
+  position: absolute;
+  top: 14px; left: 18px;
+  color: #00ff41;
+  font-size: 0.8em;
+  line-height: 1.7;
+  text-shadow: 0 0 12px #00ff41, 0 0 24px #00aa2288;
+  pointer-events: all;
+}
+#title a { color: #009922; text-decoration: none; }
+#title a:hover { color: #00ff41; text-shadow: 0 0 8px #00ff41; }
+#title .sub { color: #007722; font-size: 0.9em; }
+
+/* Block feed top-right */
+#feed {
+  position: absolute;
+  top: 14px; right: 16px;
+  width: 310px;
+  background: rgba(0, 8, 2, 0.85);
+  border: 1px solid #003a0a;
+  border-radius: 5px;
+  padding: 10px 12px;
+  pointer-events: all;
+  overflow: hidden;
+}
+#feed .ftitle {
+  color: #00ff41;
+  font-size: 0.78em;
+  text-shadow: 0 0 8px #00ff41;
+  margin-bottom: 7px;
+  letter-spacing: 0.08em;
+}
+.fitem {
+  font-size: 0.69em;
+  color: #006622;
+  padding: 4px 0;
+  border-bottom: 1px solid #001a06;
+  line-height: 1.5;
+  word-break: break-all;
+  transition: color 0.6s;
+}
+.fitem:last-child { border-bottom: none; }
+.fitem .ftag { color: #004011; }
+.fitem .fhash { color: #008833; font-size: 0.95em; }
+.fitem.fresh .fhash { color: #00ff41; text-shadow: 0 0 8px #00ff41; }
+
+/* Block announce center */
+#announce {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+#announce.show { opacity: 1; }
+#announce .a-label {
+  font-size: 0.68em;
+  color: #009933;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+#announce .a-hash {
+  font-size: 0.78em;
+  color: #00ff88;
+  text-shadow: 0 0 16px #00ff88, 0 0 40px #00aa4466;
+  word-break: break-all;
+  max-width: 500px;
+  letter-spacing: 0.06em;
+  line-height: 1.7;
+}
+
+/* Controls bottom-right */
+#controls {
+  position: absolute;
+  bottom: 44px; right: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  pointer-events: all;
+}
+.ctrl {
+  background: rgba(0, 14, 4, 0.82);
+  color: #00bb33;
+  border: 1px solid #003a0a;
+  border-radius: 4px;
+  padding: 5px 12px;
+  font-family: inherit;
+  font-size: 0.72em;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.ctrl:hover {
+  background: rgba(0, 30, 8, 0.92);
+  border-color: #00aa22;
+  color: #00ff41;
+}
+
+/* Status bottom */
+#status {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  padding: 10px 18px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  font-size: 0.72em;
+  color: #006622;
+  background: linear-gradient(transparent, rgba(0,0,0,0.72));
+  pointer-events: all;
+}
+.dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  background: #00ff41;
+  box-shadow: 0 0 7px #00ff41;
+  animation: pulse 1.4s infinite;
+}
+.dot.idle  { background: #224422; box-shadow: none; animation: none; }
+.dot.err   { background: #ff3333; box-shadow: 0 0 7px #ff3333; animation: none; }
+.dot.wait  { background: #aaaa00; box-shadow: 0 0 7px #aaaa00; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.25} }
+#statusText { color: #009933; }
+#blockCount { margin-left: auto; color: #004411; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hud">
+  <div id="title">
+    <div>&#x2B21; <b style="letter-spacing:.06em">NANO MATRIX RAIN</b></div>
+    <div class="sub">Characters seeded by live Nano blockhashes</div>
+    <div class="sub" style="margin-top:2px">
+      <a href="index.html">&larr; BIP39 Generator</a>
+      &nbsp;&middot;&nbsp;
+      <a href="password.html">Password &rarr;</a>
+      &nbsp;&middot;&nbsp;
+      <a href="dice.html">Dice &rarr;</a>
+    </div>
+  </div>
+
+  <div id="feed">
+    <div class="ftitle">&#9654; LIVE NANO BLOCKS</div>
+    <div id="feedList">
+      <div class="fitem" style="color:#002a08">Connecting to Nano network&hellip;</div>
+    </div>
+  </div>
+
+  <div id="announce">
+    <div class="a-label">New Block Detected</div>
+    <div class="a-hash" id="announceHash"></div>
+  </div>
+
+  <div id="controls">
+    <button class="ctrl" id="btnSpeed">Speed: Normal</button>
+    <button class="ctrl" id="btnTrail">Trail: Medium</button>
+    <button class="ctrl" id="btnPause">&#9646;&#9646; Pause</button>
+  </div>
+
+  <div id="status">
+    <span class="dot idle" id="dot"></span>
+    <span id="statusText">Connecting&hellip;</span>
+    <span id="blockCount">0 blocks injected</span>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+// Canvas setup
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+const FS     = 14;
+const HEX    = '0123456789ABCDEF'.split('');
+
+let COLS, drops, speeds, flashLeft, trailAlpha;
+trailAlpha = 0.048;
+
+function init() {
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const newCOLS = Math.floor(canvas.width / FS);
+
+  const newDrops  = new Float32Array(newCOLS);
+  const newSpeeds = new Float32Array(newCOLS);
+  const newFlash  = new Int32Array(newCOLS);
+
+  for (let i = 0; i < newCOLS; i++) {
+    if (COLS && i < COLS) {
+      newDrops[i]  = drops[i];
+      newSpeeds[i] = speeds[i];
+      newFlash[i]  = flashLeft[i];
+    } else {
+      newDrops[i]  = -Math.random() * (canvas.height / FS);
+      newSpeeds[i] = 0.35 + Math.random() * 1.1;
+      newFlash[i]  = 0;
+    }
+  }
+  COLS      = newCOLS;
+  drops     = newDrops;
+  speeds    = newSpeeds;
+  flashLeft = newFlash;
+}
+init();
+window.addEventListener('resize', init);
+
+// Char pool — ring buffer from live Nano blocks
+let charPool = [];
+const POOL_MAX = 4096;
+function randomHex() { return HEX[Math.floor(Math.random() * 16)]; }
+function poolChar() {
+  if (!charPool.length) return randomHex();
+  return charPool[Math.floor(Math.random() * charPool.length)];
+}
+
+function injectBlock(hash) {
+  const chars = hash.toUpperCase().split('').filter(c => /[0-9A-F]/.test(c));
+  charPool.push(...chars);
+  if (charPool.length > POOL_MAX) charPool.splice(0, charPool.length - POOL_MAX);
+
+  // Burst: pick random columns, restart them from top with flash + high speed
+  const burstCount = Math.max(5, Math.floor(COLS * 0.07));
+  const indices = [];
+  for (let i = 0; i < COLS; i++) indices.push(i);
+  // Fisher-Yates shuffle to pick random cols
+  for (let i = indices.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [indices[i], indices[j]] = [indices[j], indices[i]];
+  }
+  for (let k = 0; k < burstCount; k++) {
+    const col = indices[k];
+    drops[col]     = -2 - Math.random() * 8;
+    speeds[col]    = 1.8 + Math.random() * 2.2;
+    flashLeft[col] = 22 + Math.floor(Math.random() * 16);
+  }
+}
+
+// Render settings
+let paused    = false;
+let speedMult = 1.0;
+
+const SPEED_PRESETS = ['Slow', 'Normal', 'Fast', 'Turbo'];
+const SPEED_VALS    = [0.45, 1.0, 1.9, 3.8];
+const TRAIL_PRESETS = ['Short', 'Medium', 'Long', 'Ghost'];
+const TRAIL_VALS    = [0.09, 0.048, 0.025, 0.012];
+let speedIdx = 1, trailIdx = 1;
+
+// Draw loop
+function draw() {
+  requestAnimationFrame(draw);
+  if (paused) return;
+
+  // Fade overlay — creates trail
+  ctx.fillStyle = 'rgba(0,0,0,' + trailAlpha + ')';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.font = FS + 'px "Courier New", monospace';
+
+  for (let col = 0; col < COLS; col++) {
+    const x = col * FS;
+    const y = Math.floor(drops[col]) * FS;
+
+    if (y < -FS * 2 || y > canvas.height + FS) {
+      drops[col] += speeds[col] * speedMult;
+      continue;
+    }
+
+    const ch      = poolChar();
+    const isFlash = flashLeft[col] > 0;
+
+    if (isFlash) {
+      // Injected column: cyan-white burst
+      const t = flashLeft[col] / 38;
+      const r = Math.round(140 + 115 * t);
+      const g = 255;
+      const b = Math.round(160 + 95 * t);
+      ctx.fillStyle  = 'rgb(' + r + ',' + g + ',' + b + ')';
+      ctx.shadowColor = '#00ffaa';
+      ctx.shadowBlur  = 12 + t * 12;
+      ctx.fillText(ch, x, y);
+      ctx.shadowBlur  = 0;
+      flashLeft[col]--;
+      if (flashLeft[col] <= 0) speeds[col] = 0.35 + Math.random() * 1.1;
+    } else {
+      // Normal: bright green head
+      ctx.fillStyle  = '#9dffb0';
+      ctx.shadowColor = '#00ff41';
+      ctx.shadowBlur  = 7;
+      ctx.fillText(ch, x, y);
+      ctx.shadowBlur  = 0;
+    }
+
+    drops[col] += speeds[col] * speedMult;
+
+    // Reset past bottom
+    if (drops[col] * FS > canvas.height + FS * 5) {
+      if (Math.random() > 0.963) {
+        drops[col]  = -Math.random() * 22;
+        speeds[col] = 0.35 + Math.random() * 1.1;
+      }
+    }
+  }
+}
+draw();
+
+// Nano block fetching
+let lastSeenHash = null;
+let totalBlocks  = 0;
+
+const dotEl        = document.getElementById('dot');
+const statusTextEl = document.getElementById('statusText');
+const blockCountEl = document.getElementById('blockCount');
+const feedListEl   = document.getElementById('feedList');
+const announceEl   = document.getElementById('announce');
+const announceHashEl = document.getElementById('announceHash');
+let   feedItems    = [];
+let   announceTimer = null;
+
+function setStatus(state, text) {
+  dotEl.className         = 'dot ' + (state === 'live' ? '' : state);
+  statusTextEl.textContent = text;
+}
+
+function addFeedEntry(hash, isNew) {
+  const item = document.createElement('div');
+  item.className = 'fitem' + (isNew ? ' fresh' : '');
+  const tag  = document.createElement('span');
+  tag.className = 'ftag';
+  tag.textContent = (isNew ? '\u25b6 ' : '  ') + 'block ';
+  const hEl  = document.createElement('span');
+  hEl.className = 'fhash';
+  hEl.textContent = hash.slice(0, 20) + '\u2026' + hash.slice(-12);
+  item.append(tag, hEl);
+  feedListEl.prepend(item);
+  feedItems.unshift(item);
+  if (isNew) setTimeout(() => item.classList.remove('fresh'), 1400);
+  while (feedItems.length > 7) feedItems.pop().remove();
+}
+
+function showAnnounce(hash) {
+  // Split hash into groups of 8 for readability
+  announceHashEl.textContent = hash.match(/.{1,8}/g).join(' ');
+  announceEl.classList.add('show');
+  clearTimeout(announceTimer);
+  announceTimer = setTimeout(() => announceEl.classList.remove('show'), 2200);
+}
+
+async function fetchBlocks() {
+  const res = await fetch('https://api.nanexplorer.com/last-blocks?network=nano', { cache: 'no-store' });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const data = await res.json();
+  if (!data || !Array.isArray(data.last)) throw new Error('Bad response');
+  const seen = new Set();
+  const valid = [];
+  for (const b of data.last.slice(0, 16)) {
+    const h = (b && typeof b.hash === 'string') ? b.hash.trim().toUpperCase() : '';
+    if (!/^[0-9A-F]{64}$/.test(h) || seen.has(h)) continue;
+    seen.add(h);
+    valid.push(h);
+  }
+  if (!valid.length) throw new Error('No valid hash');
+  return valid;
+}
+
+async function checkForBlock() {
+  try {
+    const hashes = await fetchBlocks();
+    const newest = hashes[0];
+
+    if (lastSeenHash === null) {
+      lastSeenHash = newest;
+      feedListEl.innerHTML = '';
+      for (const h of hashes.slice(0, 5)) { injectBlock(h); addFeedEntry(h, false); }
+      totalBlocks = hashes.length;
+      setStatus('live', 'Live \u2014 watching Nano network for new blocks');
+    } else if (newest !== lastSeenHash) {
+      lastSeenHash = newest;
+      totalBlocks++;
+      injectBlock(newest);
+      addFeedEntry(newest, true);
+      showAnnounce(newest);
+      setStatus('live', 'New block injected \u2b21');
+      setTimeout(() => setStatus('live', 'Live \u2014 watching Nano network'), 2600);
+    }
+    blockCountEl.textContent = totalBlocks + ' blocks injected';
+  } catch (e) {
+    setStatus('err', 'Network error \u2014 ' + (e.message || 'retrying\u2026'));
+  }
+}
+
+setStatus('wait', 'Connecting to Nano network\u2026');
+checkForBlock();
+setInterval(checkForBlock, 2500);
+
+// Controls
+document.getElementById('btnSpeed').addEventListener('click', function () {
+  speedIdx  = (speedIdx + 1) % SPEED_PRESETS.length;
+  speedMult = SPEED_VALS[speedIdx];
+  this.textContent = 'Speed: ' + SPEED_PRESETS[speedIdx];
+});
+
+document.getElementById('btnTrail').addEventListener('click', function () {
+  trailIdx   = (trailIdx + 1) % TRAIL_PRESETS.length;
+  trailAlpha = TRAIL_VALS[trailIdx];
+  this.textContent = 'Trail: ' + TRAIL_PRESETS[trailIdx];
+});
+
+document.getElementById('btnPause').addEventListener('click', function () {
+  paused = !paused;
+  this.textContent = paused ? '\u25b6 Resume' : '\u23f8 Pause';
+});
+</script>
+</body>
+</html>
