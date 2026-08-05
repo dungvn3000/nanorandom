@@ -243,9 +243,9 @@ const PIXELS_PER_FRAME = 256;
 // SHA-256 is already a perfect compressor; extra bytes add zero entropy.
 const MAX_ENTROPY_BYTES = 64 * PIXELS_PER_FRAME * 3; // 49 152 bytes
 let capturedBytes = [];
-let frames        = 0;  // total frames ever (for strength meter)
-let cycleFrames   = 0;  // frames in current cycle (resets each generation)
-let genCount      = 0;  // how many seeds generated this session
+let frames        = 0;  // total frames captured
+let genCount      = 0;  // seeds generated this session
+let isGenerating  = false; // prevent overlapping async generate() calls
 let captureTimer  = null;
 let stream        = null;
 let lastWords     = [];
@@ -309,23 +309,15 @@ function stopCamera() {
 
 // ─── Frame capture ────────────────────────────────────────────────────────────
 function startCapture() {
-    capturedBytes  = [];
-    frames         = 0;
-    cycleFrames    = 0;
+    capturedBytes = [];
+    frames        = 0;
+    isGenerating  = false;
     progFill.classList.remove('done');
-    progFill.style.width    = '0%';
-    frameCount.textContent  = '0 / ' + FRAMES_NEEDED + ' frames';
-    frameLog.textContent    = '\u00a0';
+    progFill.style.width   = '0%';
+    frameCount.textContent = '0 / ' + FRAMES_NEEDED + ' frames';
+    frameLog.textContent   = '\u00a0';
     scanOverlay.classList.add('active');
     captureTimer = setInterval(captureFrame, 180);
-}
-
-function startNewCycle() {
-    capturedBytes = []; // fresh pixel data each cycle
-    cycleFrames   = 0;
-    progFill.classList.remove('done');
-    progFill.style.width = '0%';
-    scanOverlay.classList.add('active');
 }
 
 
@@ -349,31 +341,31 @@ function captureFrame() {
         const idx = (py * W + px) * 4;
         sample.push(imgData[idx], imgData[idx + 1], imgData[idx + 2]); // R, G, B
     }
-    // Only push if buffer is not yet full
+    // Rolling buffer — keep appending, capped at MAX_ENTROPY_BYTES
     if (capturedBytes.length < MAX_ENTROPY_BYTES) {
         capturedBytes.push(...sample);
     }
     frames++;
-    cycleFrames++;
 
-    // Progress bar tracks current cycle (0→32), not total
-    const pct = Math.min(100, Math.round(cycleFrames / FRAMES_NEEDED * 100));
+    // Progress bar fills to 100% at FRAMES_NEEDED then stays full
+    const pct = Math.min(100, Math.round(frames / FRAMES_NEEDED * 100));
     progFill.style.width   = pct + '%';
-    frameCount.textContent = 'Cycle ' + cycleFrames + ' / ' + FRAMES_NEEDED;
+    if (frames === FRAMES_NEEDED) {
+        progFill.classList.add('done');
+        scanOverlay.classList.remove('active');
+        dot.className = 'dot ok';
+    }
+    frameCount.textContent = frames + ' frames';
 
     if (frames % 4 === 0) {
         frameLog.textContent = 'Sample: ' + sample.slice(0, 12).map(b => b.toString(16).padStart(2,'0')).join(' ') + '\u2026';
     }
 
-    // End of cycle: generate new seed, reset buffer, start next cycle
-    if (cycleFrames === FRAMES_NEEDED) {
-        scanOverlay.classList.remove('active');
-        progFill.classList.add('done');
-        dot.className = 'dot ok';
-        generate().then(() => {
-            // Brief pause so user sees the completed bar, then start next cycle
-            setTimeout(startNewCycle, 400);
-        });
+    // Generate every frame once we have enough data
+    // isGenerating prevents SHA-256 calls from piling up
+    if (frames >= FRAMES_NEEDED && !isGenerating) {
+        isGenerating = true;
+        generate().finally(() => { isGenerating = false; });
     }
 }
 
@@ -421,8 +413,8 @@ async function generate() {
 
         genCount++;
         entHex.textContent = bytesToHex(entropyBytes);
-        entSrc.textContent = 'Sources: CSPRNG salt (32 B) + camera pixels (' + capturedBytes.length + ' B, cycle ' + cycleFrames + ' frames)';
-        statusText.textContent = '\u2714 Seed #' + genCount + ' \u2014 next cycle starting\u2026';
+        entSrc.textContent = 'Sources: CSPRNG salt (32 B) + ' + capturedBytes.length + ' B camera (' + frames + ' frames)';
+        statusText.textContent = '\u2714 Seed #' + genCount;
         genCountEl.textContent = '\u00b7 #' + genCount;
         dot.className = 'dot ok';
 
