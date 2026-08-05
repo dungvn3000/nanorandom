@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="NanoRandom — Free, open-source cryptographic randomness using browser CSPRNG mixed with live Nano blockchain hashes. No expensive hardware required.">
+<title>NanoRandom — Blockchain-Mixed Cryptographic Randomness, Free &amp; Open</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ── Reset & tokens ─────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #06090b;
+  --bg1:       #0c1217;
+  --bg2:       #111820;
+  --border:    #1c2a35;
+  --border2:   #243040;
+  --txt:       #d4e8f0;
+  --txt2:      #7a9aaa;
+  --txt3:      #3d5a68;
+  --green:     #00e676;
+  --green2:    #00c853;
+  --cyan:      #00e5ff;
+  --cyan2:     #00b8d9;
+  --teal:      #1de9b6;
+  --red:       #ff5252;
+  --yellow:    #ffd740;
+  --card-bg:   rgba(12, 22, 32, 0.80);
+  --glow-g:    0 0 24px rgba(0,230,118,0.18);
+  --glow-c:    0 0 24px rgba(0,229,255,0.18);
+  --r:         10px;
+  --r-sm:      6px;
+  --font:      'Inter', system-ui, sans-serif;
+  --mono:      'JetBrains Mono', 'Courier New', monospace;
+}
+
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--txt);
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.65;
+  overflow-x: hidden;
+}
+
+/* ── Utility ─────────────────────────────────────────────────── */
+.container { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+.mono { font-family: var(--mono); }
+.tag {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 0.72em;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 20px;
+  margin-bottom: 18px;
+}
+.tag-green { background: rgba(0,230,118,0.12); color: var(--green); border: 1px solid rgba(0,230,118,0.25); }
+.tag-cyan  { background: rgba(0,229,255,0.10); color: var(--cyan);  border: 1px solid rgba(0,229,255,0.22); }
+.tag-teal  { background: rgba(29,233,182,0.10); color: var(--teal); border: 1px solid rgba(29,233,182,0.22); }
+.tag-red   { background: rgba(255,82,82,0.10);  color: var(--red);  border: 1px solid rgba(255,82,82,0.22); }
+
+h1, h2, h3 { font-weight: 700; line-height: 1.25; letter-spacing: -0.02em; }
+a { color: var(--cyan); text-decoration: none; }
+a:hover { color: var(--teal); }
+
+/* ── Nav ─────────────────────────────────────────────────────── */
+nav {
+  position: sticky; top: 0; z-index: 100;
+  border-bottom: 1px solid var(--border);
+  background: rgba(6, 9, 11, 0.88);
+  backdrop-filter: blur(16px);
+}
+.nav-inner {
+  display: flex; align-items: center; gap: 8px;
+  padding: 14px 24px;
+  max-width: 1080px; margin: 0 auto;
+}
+.nav-logo {
+  font-family: var(--mono);
+  font-weight: 600;
+  font-size: 1em;
+  color: var(--green);
+  text-shadow: var(--glow-g);
+  margin-right: auto;
+  display: flex; align-items: center; gap: 8px;
+}
+.nav-logo .hex { font-size: 1.2em; }
+.nav-link {
+  font-size: 0.82em;
+  color: var(--txt2);
+  padding: 6px 14px;
+  border-radius: var(--r-sm);
+  border: 1px solid transparent;
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
+}
+.nav-link:hover {
+  color: var(--txt);
+  border-color: var(--border2);
+  background: var(--bg2);
+}
+.nav-cta {
+  font-size: 0.82em; font-weight: 600;
+  color: var(--bg);
+  background: var(--green);
+  padding: 7px 16px;
+  border-radius: var(--r-sm);
+  transition: background 0.2s, box-shadow 0.2s;
+}
+.nav-cta:hover { background: var(--teal); color: var(--bg); box-shadow: var(--glow-g); }
+
+/* ── Hero ─────────────────────────────────────────────────────── */
+.hero {
+  position: relative;
+  padding: 100px 24px 90px;
+  text-align: center;
+  overflow: hidden;
+}
+/* Animated grid background */
+.hero::before {
+  content: '';
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(rgba(0,229,255,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,229,255,0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 40%, black 30%, transparent 80%);
+  pointer-events: none;
+}
+/* Glow blobs */
+.hero::after {
+  content: '';
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse 600px 300px at 30% 50%, rgba(0,230,118,0.06) 0%, transparent 70%),
+    radial-gradient(ellipse 600px 300px at 70% 40%, rgba(0,229,255,0.06) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero-content { position: relative; z-index: 1; }
+.hero-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: var(--mono); font-size: 0.75em;
+  color: var(--txt2);
+  border: 1px solid var(--border2);
+  border-radius: 20px;
+  padding: 5px 14px;
+  margin-bottom: 32px;
+  background: rgba(12,18,23,0.6);
+}
+.hero-badge .dot-live {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--green); box-shadow: 0 0 6px var(--green);
+  animation: blink 1.6s infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
+
+.hero h1 {
+  font-size: clamp(2.2rem, 5vw, 3.6rem);
+  color: #fff;
+  margin-bottom: 20px;
+}
+.hero h1 .hl-green { color: var(--green); }
+.hero h1 .hl-cyan  { color: var(--cyan); }
+.hero-sub {
+  font-size: clamp(1rem, 2vw, 1.15rem);
+  color: var(--txt2);
+  max-width: 620px; margin: 0 auto 40px;
+  line-height: 1.7;
+}
+.hero-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 12px 26px; border-radius: var(--r-sm);
+  font-weight: 600; font-size: 0.92em;
+  transition: all 0.2s;
+}
+.btn-primary {
+  background: var(--green); color: var(--bg);
+}
+.btn-primary:hover { background: var(--teal); color: var(--bg); box-shadow: 0 0 28px rgba(0,230,118,0.35); }
+.btn-outline {
+  background: transparent; color: var(--txt);
+  border: 1px solid var(--border2);
+}
+.btn-outline:hover { border-color: var(--cyan2); color: var(--cyan); background: rgba(0,229,255,0.06); }
+
+/* Hero stats */
+.hero-stats {
+  display: flex; gap: 40px; justify-content: center; flex-wrap: wrap;
+  margin-top: 60px;
+  padding-top: 40px;
+  border-top: 1px solid var(--border);
+}
+.stat { text-align: center; }
+.stat-val {
+  font-family: var(--mono); font-size: 1.7em; font-weight: 600;
+  color: var(--green); display: block;
+}
+.stat-label { font-size: 0.78em; color: var(--txt3); margin-top: 2px; }
+
+/* ── Section base ─────────────────────────────────────────────── */
+section { padding: 80px 0; }
+section + section { border-top: 1px solid var(--border); }
+.section-head { margin-bottom: 52px; }
+.section-head h2 { font-size: clamp(1.6rem, 3vw, 2.2rem); color: #fff; margin-bottom: 12px; }
+.section-head p { color: var(--txt2); max-width: 560px; font-size: 0.97em; }
+
+/* ── Problem section ─────────────────────────────────────────── */
+.problem-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
+}
+.problem-card {
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 28px;
+  position: relative;
+  overflow: hidden;
+}
+.problem-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: var(--red);
+  opacity: 0.6;
+}
+.problem-icon { font-size: 1.8em; margin-bottom: 14px; }
+.problem-card h3 { font-size: 1em; color: #fff; margin-bottom: 8px; }
+.problem-card p { font-size: 0.86em; color: var(--txt2); line-height: 1.6; }
+
+/* ── Solution section ────────────────────────────────────────── */
+.solution-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+  align-items: start;
+}
+@media (max-width: 700px) { .solution-layout { grid-template-columns: 1fr; } }
+
+.solution-text h2 { font-size: clamp(1.5rem, 3vw, 2rem); color: #fff; margin-bottom: 16px; }
+.solution-text p  { color: var(--txt2); font-size: 0.95em; margin-bottom: 16px; }
+
+.layer-stack { display: flex; flex-direction: column; gap: 12px; }
+.layer {
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 20px 22px;
+  display: flex; align-items: flex-start; gap: 16px;
+  position: relative; overflow: hidden;
+  transition: border-color 0.2s;
+}
+.layer:hover { border-color: var(--border2); }
+.layer-num {
+  font-family: var(--mono); font-size: 0.72em; font-weight: 600;
+  width: 28px; height: 28px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.layer-1 .layer-num { background: rgba(0,230,118,0.15); color: var(--green); }
+.layer-2 .layer-num { background: rgba(0,229,255,0.12); color: var(--cyan); }
+.layer-3 .layer-num { background: rgba(29,233,182,0.12); color: var(--teal); }
+.layer-1 { border-left: 3px solid rgba(0,230,118,0.4); }
+.layer-2 { border-left: 3px solid rgba(0,229,255,0.35); }
+.layer-3 { border-left: 3px solid rgba(29,233,182,0.35); }
+.layer-body h4 { font-size: 0.9em; color: #fff; margin-bottom: 4px; }
+.layer-body p  { font-size: 0.82em; color: var(--txt2); line-height: 1.55; }
+
+/* Formula box */
+.formula-box {
+  background: var(--bg1);
+  border: 1px solid var(--border2);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+.formula-box .fb-header {
+  background: var(--bg2);
+  padding: 10px 18px;
+  font-family: var(--mono); font-size: 0.72em; color: var(--txt3);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 8px;
+}
+.fb-dot { width: 10px; height: 10px; border-radius: 50%; }
+.formula-box pre {
+  padding: 22px 20px;
+  font-family: var(--mono);
+  font-size: 0.8em;
+  line-height: 1.9;
+  color: var(--txt2);
+  overflow-x: auto;
+  white-space: pre;
+}
+.c  { color: var(--txt3); }
+.g  { color: var(--green); }
+.cy { color: var(--cyan); }
+.tl { color: var(--teal); }
+.yw { color: var(--yellow); }
+
+/* ── Why blockchain? ─────────────────────────────────────────── */
+.why-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px;
+}
+.why-card {
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 24px 22px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.why-card:hover { border-color: var(--border2); box-shadow: var(--glow-c); }
+.why-icon { font-size: 1.5em; margin-bottom: 12px; }
+.why-card h3 { font-size: 0.9em; color: #fff; margin-bottom: 6px; }
+.why-card p  { font-size: 0.82em; color: var(--txt2); line-height: 1.55; }
+
+/* ── Why Nano? ────────────────────────────────────────────────── */
+.nano-features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+.nano-feat {
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 20px 20px;
+  text-align: center;
+}
+.nano-feat .nf-val {
+  font-family: var(--mono);
+  font-size: 1.5em; font-weight: 700;
+  color: var(--green);
+  display: block; margin-bottom: 4px;
+}
+.nano-feat .nf-label { font-size: 0.8em; color: var(--txt2); }
+.nano-feat .nf-sub   { font-size: 0.72em; color: var(--txt3); margin-top: 2px; }
+
+/* ── Tools grid ──────────────────────────────────────────────── */
+.tools-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+}
+.tool-card {
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 30px 26px;
+  display: flex; flex-direction: column;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+  position: relative; overflow: hidden;
+}
+.tool-card::after {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: var(--r);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.tool-card:hover { transform: translateY(-3px); }
+.tool-card.tc-green { --tc: var(--green); }
+.tool-card.tc-cyan  { --tc: var(--cyan); }
+.tool-card.tc-teal  { --tc: var(--teal); }
+.tool-card.tc-purple { --tc: #b388ff; }
+.tool-card:hover { border-color: var(--tc); box-shadow: 0 0 28px rgba(0,0,0,0.3); }
+.tool-card .tc-top {
+  width: 40px; height: 40px; border-radius: var(--r-sm);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.3em; margin-bottom: 18px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+}
+.tool-card h3 { font-size: 1em; color: #fff; margin-bottom: 6px; }
+.tool-card p  { font-size: 0.83em; color: var(--txt2); line-height: 1.55; flex: 1; }
+.tool-card .tc-link {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-top: 20px; font-size: 0.82em; font-weight: 600;
+  color: var(--tc);
+}
+.tool-card .tc-link:hover { gap: 10px; }
+
+/* ── Security section ─────────────────────────────────────────── */
+.security-two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+@media (max-width: 640px) { .security-two { grid-template-columns: 1fr; } }
+.sec-box {
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 28px;
+}
+.sec-box h3 { font-size: 0.95em; color: #fff; margin-bottom: 12px; }
+.sec-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.sec-list li {
+  display: flex; align-items: flex-start; gap: 10px;
+  font-size: 0.84em; color: var(--txt2); line-height: 1.5;
+}
+.sec-list li .ico { flex-shrink: 0; margin-top: 1px; }
+
+/* ── Footer ──────────────────────────────────────────────────── */
+footer {
+  border-top: 1px solid var(--border);
+  padding: 40px 24px;
+  text-align: center;
+  font-size: 0.8em;
+  color: var(--txt3);
+}
+footer a { color: var(--txt2); }
+footer a:hover { color: var(--txt); }
+</style>
+</head>
+<body>
+
+<!-- ── Nav ───────────────────────────────────────────────────── -->
+<nav>
+  <div class="nav-inner">
+    <div class="nav-logo">
+      <span class="hex">&#x2B21;</span> NanoRandom
+    </div>
+    <a class="nav-link" href="#how-it-works">How it works</a>
+    <a class="nav-link" href="#why-blockchain">Why blockchain</a>
+    <a class="nav-link" href="#tools">Tools</a>
+    <a class="nav-link" href="https://github.com/dungvn3000/nanorandom#readme" target="_blank" rel="noopener">GitHub</a>
+    <a class="nav-cta" href="bip39.html">Launch App &#x2192;</a>
+  </div>
+</nav>
+
+<!-- ── Hero ──────────────────────────────────────────────────── -->
+<section class="hero">
+  <div class="hero-content">
+    <div class="hero-badge">
+      <span class="dot-live"></span>
+      Live Nano blockhashes &mdash; no cost, no hardware
+    </div>
+    <h1>
+      <span class="hl-green">Cryptographic randomness</span><br>
+      you don&rsquo;t have to buy.
+    </h1>
+    <p class="hero-sub">
+      NanoRandom mixes your browser&rsquo;s built-in CSPRNG with live,
+      public Nano blockchain hashes&nbsp;&mdash; giving you two independent
+      entropy sources for the price of zero.
+      No HSM. No hardware token. No server.
+    </p>
+    <div class="hero-actions">
+      <a class="btn btn-primary" href="bip39.html">&#x26BF; Generate BIP39 Seed</a>
+      <a class="btn btn-outline" href="#how-it-works">How it works &darr;</a>
+    </div>
+
+    <div class="hero-stats">
+      <div class="stat">
+        <span class="stat-val">$0</span>
+        <span class="stat-label">Hardware cost</span>
+      </div>
+      <div class="stat">
+        <span class="stat-val">2</span>
+        <span class="stat-label">Independent entropy sources</span>
+      </div>
+      <div class="stat">
+        <span class="stat-val">256-bit</span>
+        <span class="stat-label">Security level</span>
+      </div>
+      <div class="stat">
+        <span class="stat-val">1 file</span>
+        <span class="stat-label">Zero dependencies</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Problem ─────────────────────────────────────────────────── -->
+<section id="problem">
+  <div class="container">
+    <div class="section-head">
+      <div class="tag tag-red">The Problem</div>
+      <h2>A single RNG is a single point of failure</h2>
+      <p>Most tools rely on one source of randomness. That&rsquo;s fine&nbsp;&mdash;
+        until it isn&rsquo;t.</p>
+    </div>
+    <div class="problem-grid">
+      <div class="problem-card">
+        <div class="problem-icon">&#x1F4BB;</div>
+        <h3>Browser CSPRNG alone</h3>
+        <p>
+          <code>crypto.getRandomValues()</code> is excellent, but it is the
+          <em>only</em> gate between you and a broken RNG.
+          A buggy browser build, a mocked environment, or a compromised
+          test harness silently collapses your key&rsquo;s entropy to zero.
+        </p>
+      </div>
+      <div class="problem-card">
+        <div class="problem-icon">&#x1F4B8;</div>
+        <h3>Hardware RNG devices</h3>
+        <p>
+          True random number generators (HSMs, YubiKeys, Ledger, dedicated
+          TRNG boards) provide excellent physical entropy&nbsp;&mdash; but
+          they cost money, require drivers, and are not available to most
+          people when they need to generate a wallet today.
+        </p>
+      </div>
+      <div class="problem-card">
+        <div class="problem-icon">&#x1F575;&#xFE0F;</div>
+        <h3>Closed-source online tools</h3>
+        <p>
+          Many wallet generators run on a server you cannot inspect.
+          You have to trust that the server&rsquo;s RNG is honest and
+          that your generated keys are not logged. That trust is unverifiable.
+        </p>
+      </div>
+      <div class="problem-card">
+        <div class="problem-icon">&#x1F504;</div>
+        <h3>Reproducible outputs</h3>
+        <p>
+          If an attacker knows (or can predict) your RNG state&nbsp;&mdash;
+          through a VM snapshot, a leaked seed, or a deterministic test
+          environment&nbsp;&mdash; every key you generate from that point
+          forward is compromised.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Solution / How it works ─────────────────────────────────── -->
+<section id="how-it-works">
+  <div class="container">
+    <div class="solution-layout">
+      <div class="solution-text">
+        <div class="tag tag-green">The Solution</div>
+        <h2>Two independent entropy sources, hashed together</h2>
+        <p>
+          NanoRandom layers your browser&rsquo;s CSPRNG on top of live,
+          public Nano blockchain hashes. Both must be broken simultaneously
+          for the output to be predictable.
+        </p>
+        <p>
+          An attacker who compromises your browser RNG still cannot reproduce
+          your output without also knowing <em>exactly which blocks</em> were
+          fetched at the moment you clicked Generate &mdash; a moving,
+          public target that changes every few milliseconds on the Nano network.
+        </p>
+        <p>
+          An attacker who controls the entire Nano network still cannot
+          predict your output without your browser&rsquo;s secret 32-byte CSPRNG salt.
+        </p>
+        <div class="layer-stack" style="margin-top:28px">
+          <div class="layer layer-1">
+            <div class="layer-num">1</div>
+            <div class="layer-body">
+              <h4>System CSPRNG &mdash; the secret anchor</h4>
+              <p><code>crypto.getRandomValues(32 bytes)</code> &mdash;
+                OS-backed, never leaves your device, never exposed.</p>
+            </div>
+          </div>
+          <div class="layer layer-2">
+            <div class="layer-num">2</div>
+            <div class="layer-body">
+              <h4>Live blockchain hashes &mdash; the public witness</h4>
+              <p>Up to 16 validated Nano blockhashes fetched at generate-time.
+                Public and timestamped, verifiable by anyone.</p>
+            </div>
+          </div>
+          <div class="layer layer-3">
+            <div class="layer-num">3</div>
+            <div class="layer-body">
+              <h4>SHA-256 combiner &mdash; one-way mix</h4>
+              <p>Both inputs are concatenated and hashed. Neither input can
+                be recovered from the output.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="formula-box">
+          <div class="fb-header">
+            <span class="fb-dot" style="background:#ff5f57"></span>
+            <span class="fb-dot" style="background:#febc2e"></span>
+            <span class="fb-dot" style="background:#28c840"></span>
+            <span style="margin-left:6px">entropy-formula.txt</span>
+          </div>
+          <pre><span class="c"># Inputs</span>
+<span class="g">salt</span>    = crypto.getRandomValues(<span class="yw">32</span>)
+            <span class="c"># fresh CSPRNG bytes, secret, per-click</span>
+
+<span class="cy">userSalt</span> = UTF-8(<span class="yw">user_text</span>)
+            <span class="c"># optional extra passphrase</span>
+
+<span class="tl">blocks</span>  = validated_nano_hashes(<span class="yw">≤16</span>)
+            <span class="c"># 64 hex chars each → 32 raw bytes</span>
+            <span class="c"># fetched live, deduped, hex-validated</span>
+
+<span class="c"># Mix</span>
+<span class="yw">combined</span> = <span class="g">salt</span> ++ <span class="cy">userSalt</span> ++ <span class="tl">blocks</span>
+
+<span class="c"># Output entropy (BIP39 uses 16–32 bytes)</span>
+<span class="yw">entropy</span>  = SHA-256(<span class="yw">combined</span>)[<span class="yw">0</span> : <span class="yw">ENT_bytes</span>]
+
+<span class="c"># Both must be broken to predict entropy:</span>
+<span class="c">#   compromised CSPRNG  → blocks protect it</span>
+<span class="c">#   controlled network  → CSPRNG salt protects it</span></pre>
+        </div>
+
+        <div style="margin-top:16px; background:var(--bg1); border:1px solid var(--border); border-radius:var(--r); padding:20px 22px;">
+          <p style="font-size:0.82em; color:var(--txt2); line-height:1.65;">
+            <strong style="color:var(--txt)">Offline-first.</strong>
+            With "Mix blockhashes" disabled, the tool generates entropy purely
+            from <code>crypto.getRandomValues()</code> &mdash; the same method
+            used by major hardware wallets and browser extensions.
+            No network call is ever required.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Why blockchain? ─────────────────────────────────────────── -->
+<section id="why-blockchain">
+  <div class="container">
+    <div class="section-head">
+      <div class="tag tag-cyan">Why blockchain?</div>
+      <h2>A free, public, tamper-evident entropy source</h2>
+      <p>Live blockchain hashes act as a publicly-verifiable entropy witness that
+         costs nothing to use and is controlled by no single party.</p>
+    </div>
+    <div class="why-grid">
+      <div class="why-card">
+        <div class="why-icon">&#x1F4F6;</div>
+        <h3>Always available, always free</h3>
+        <p>Public blockchain APIs require no account, no API key, and no payment.
+           Any connected device can query them in milliseconds.</p>
+      </div>
+      <div class="why-card">
+        <div class="why-icon">&#x1F4CB;</div>
+        <h3>Publicly verifiable</h3>
+        <p>Every blockhash used in your generation is displayed and linkable.
+           A third party can verify the hash existed at that moment in history.</p>
+      </div>
+      <div class="why-card">
+        <div class="why-icon">&#x23F1;&#xFE0F;</div>
+        <h3>Timestamped &amp; ephemeral</h3>
+        <p>Blocks are confirmed once and are immutable. The exact set of hashes
+           available in a 2.5-second window is practically impossible to predict
+           in advance or replay.</p>
+      </div>
+      <div class="why-card">
+        <div class="why-icon">&#x1F6AB;</div>
+        <h3>No single controller</h3>
+        <p>No single entity can silently bias or predict all Nano block hashes
+           without owning the majority of the network&nbsp;&mdash; a public,
+           detectable attack.</p>
+      </div>
+      <div class="why-card">
+        <div class="why-icon">&#x1F512;</div>
+        <h3>Defense-in-depth</h3>
+        <p>Even if the blockchain data were biased or manipulated, the secret
+           CSPRNG salt &mdash; which never leaves your device &mdash; makes
+           the final entropy unpredictable to the attacker.</p>
+      </div>
+      <div class="why-card">
+        <div class="why-icon">&#x1F4B0;</div>
+        <h3>Replaces expensive hardware</h3>
+        <p>Hardware TRNGs provide physical entropy isolation. Blockchain mixing
+           provides a free software-level equivalent: an entropy source outside
+           your local machine that an attacker must also compromise.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Why Nano? ───────────────────────────────────────────────── -->
+<section id="why-nano">
+  <div class="container">
+    <div class="section-head">
+      <div class="tag tag-teal">Why Nano blockchain?</div>
+      <h2>High-frequency, feeless blocks &mdash; ideal entropy variety</h2>
+      <p>Not all blockchains are equally suited as entropy witnesses. Nano&rsquo;s
+         architecture makes it uniquely well-suited for this purpose.</p>
+    </div>
+    <div class="nano-features">
+      <div class="nano-feat">
+        <span class="nf-val">~1s</span>
+        <span class="nf-label">Finality time</span>
+        <span class="nf-sub">New blocks every second</span>
+      </div>
+      <div class="nano-feat">
+        <span class="nf-val">$0</span>
+        <span class="nf-label">Transaction fees</span>
+        <span class="nf-sub">Feeless = high block volume</span>
+      </div>
+      <div class="nano-feat">
+        <span class="nf-val">64 chars</span>
+        <span class="nf-label">Hash length</span>
+        <span class="nf-sub">256-bit Blake2b hash</span>
+      </div>
+      <div class="nano-feat">
+        <span class="nf-val">Public</span>
+        <span class="nf-label">Explorer API</span>
+        <span class="nf-sub">No key required</span>
+      </div>
+    </div>
+    <div style="margin-top:24px; background:var(--bg1); border:1px solid var(--border); border-radius:var(--r); padding:22px 24px;">
+      <p style="font-size:0.85em; color:var(--txt2); line-height:1.7;">
+        <strong style="color:var(--txt)">Same approach, any blockchain.</strong>
+        The mixing technique works with any chain that exposes a public block-hash API
+        &mdash; Ethereum, Bitcoin, Solana, etc. NanoRandom uses Nano because its
+        feeless model produces a very high volume of unique hashes per second,
+        maximising the variety of entropy windows available to each generation event.
+        Swapping the API endpoint would work identically.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Tools ─────────────────────────────────────────────────── -->
+<section id="tools">
+  <div class="container">
+    <div class="section-head">
+      <div class="tag tag-green">Tools</div>
+      <h2>Everything runs in your browser, offline</h2>
+      <p>Each tool is a single self-contained HTML file. Download it, open it
+         locally, and use it with zero network access if you prefer.</p>
+    </div>
+    <div class="tools-grid">
+      <div class="tool-card tc-green">
+        <div class="tc-top">&#x1F331;</div>
+        <h3>BIP39 Seed Phrase Generator</h3>
+        <p>Generates 12, 15, 18 or 24-word BIP39 mnemonic seed phrases.
+           Optional user salt. Optional blockhash mixing. Valid checksum guaranteed.</p>
+        <a class="tc-link" href="bip39.html">Open generator &#x2192;</a>
+      </div>
+      <div class="tool-card tc-cyan">
+        <div class="tc-top">&#x1F511;</div>
+        <h3>Password Generator</h3>
+        <p>Configurable length (8&ndash;128 chars), character sets, and rejection
+           sampling to eliminate modulo bias. Fisher-Yates shuffle guarantees
+           every charset appears without leaking positional structure.</p>
+        <a class="tc-link" href="password.html">Open generator &#x2192;</a>
+      </div>
+      <div class="tool-card tc-teal">
+        <div class="tc-top">&#x1F3B2;</div>
+        <h3>Live Dice Roller</h3>
+        <p>Auto-rolls on every new Nano block. d4 through d100, up to 20 dice.
+           Each roll seeded by SHA-256(CSPRNG salt&nbsp;||&nbsp;block hash)
+           with rejection-sampling for zero modulo bias.</p>
+        <a class="tc-link" href="dice.html">Open roller &#x2192;</a>
+      </div>
+      <div class="tool-card tc-purple">
+        <div class="tc-top">&#x1F7E9;</div>
+        <h3>Nano Matrix Rain</h3>
+        <p>Visualise live Nano blockhashes as a Matrix-style hex rain.
+           Every character on screen is a real hex digit from a real block.
+           New blocks trigger a burst flash injection.</p>
+        <a class="tc-link" href="matrix.html">Open visualiser &#x2192;</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Security notes ─────────────────────────────────────────── -->
+<section id="security">
+  <div class="container">
+    <div class="section-head">
+      <div class="tag tag-cyan">Security properties</div>
+      <h2>What this tool guarantees &mdash; and what it doesn&rsquo;t</h2>
+    </div>
+    <div class="security-two">
+      <div class="sec-box">
+        <h3>&#x2705; What NanoRandom guarantees</h3>
+        <ul class="sec-list">
+          <li><span class="ico">&#x2714;</span>
+            Entropy never derived from <code>Math.random()</code> — always
+            from <code>crypto.getRandomValues()</code>.
+          </li>
+          <li><span class="ico">&#x2714;</span>
+            Fail-closed: if <code>crypto.subtle</code> or
+            <code>getRandomValues</code> is unavailable, generation
+            refuses to proceed rather than silently degrading.
+          </li>
+          <li><span class="ico">&#x2714;</span>
+            Blockhash validation: each hash must be exactly 64 uppercase
+            hex characters before it is accepted into the mix.
+          </li>
+          <li><span class="ico">&#x2714;</span>
+            No XSS surface: all DOM writes use <code>textContent</code>
+            or <code>createElement</code> — never <code>innerHTML</code>
+            for user-controlled data.
+          </li>
+          <li><span class="ico">&#x2714;</span>
+            Rejection sampling for all character/index selection —
+            zero modulo bias.
+          </li>
+          <li><span class="ico">&#x2714;</span>
+            Correct BIP39 checksum (ENT/32 bits of SHA-256).
+          </li>
+        </ul>
+      </div>
+      <div class="sec-box">
+        <h3>&#x26A0;&#xFE0F; What this tool does not guarantee</h3>
+        <ul class="sec-list">
+          <li><span class="ico">&#x26A0;&#xFE0F;</span>
+            Protection against a fully compromised operating system or
+            browser process. If your OS is rooted, no software tool helps.
+          </li>
+          <li><span class="ico">&#x26A0;&#xFE0F;</span>
+            The nanexplorer.com API is a third-party service. If it is
+            down or returns invalid data, block mixing falls back to
+            CSPRNG-only (or throws, depending on mode).
+          </li>
+          <li><span class="ico">&#x26A0;&#xFE0F;</span>
+            Screen privacy: the seed phrase is displayed in plaintext.
+            Use in a private location, enable browser privacy mode,
+            and clear the page after writing down your phrase.
+          </li>
+          <li><span class="ico">&#x26A0;&#xFE0F;</span>
+            Long-term storage security. The tool generates the phrase;
+            storing it safely on paper, metal, or an encrypted vault
+            is your responsibility.
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Footer ─────────────────────────────────────────────────── -->
+<footer>
+  <div class="container">
+    <p style="margin-bottom:10px">
+      <a href="https://github.com/dungvn3000/nanorandom" target="_blank" rel="noopener">
+        &#x2B21; NanoRandom on GitHub
+      </a>
+      &nbsp;&middot;&nbsp;
+      <a href="bip39.html">BIP39</a>
+      &nbsp;&middot;&nbsp;
+      <a href="password.html">Password</a>
+      &nbsp;&middot;&nbsp;
+      <a href="dice.html">Dice</a>
+      &nbsp;&middot;&nbsp;
+      <a href="matrix.html">Matrix Rain</a>
+    </p>
+    <p>
+      Single-file, zero-dependency, fully open-source.
+      No tracking. No servers. No cost.
+    </p>
+  </div>
+</footer>
+
+</body>
+</html>
