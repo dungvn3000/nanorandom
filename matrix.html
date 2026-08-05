@@ -80,17 +80,17 @@ body::after {
 .fitem .fhash { color: #008833; font-size: 0.95em; }
 .fitem.fresh .fhash { color: #00ff41; text-shadow: 0 0 8px #00ff41; }
 
-/* Block announce center */
+/* Block announce bottom */
 #announce {
   position: absolute;
-  top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
+  bottom: 80px; left: 50%;
+  transform: translateX(-50%) translateY(16px);
   text-align: center;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 0.25s;
+  transition: opacity 0.25s, transform 0.25s;
 }
-#announce.show { opacity: 1; }
+#announce.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 #announce .a-label {
   font-size: 0.68em;
   color: #009933;
