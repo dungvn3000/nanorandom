@@ -182,6 +182,24 @@ nav {
 }
 .nav-cta:hover { background: var(--teal); color: var(--bg); box-shadow: var(--glow-g); }
 
+.nav-links { display: flex; align-items: center; gap: 8px; }
+.nav-toggle {
+  display: none;
+  background: transparent;
+  border: 1px solid var(--border2);
+  color: var(--txt);
+  border-radius: var(--r-sm);
+  width: 38px; height: 38px;
+  font-size: 1.15em; line-height: 1;
+  cursor: pointer;
+  align-items: center; justify-content: center;
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
+}
+.nav-toggle:hover { color: var(--cyan); border-color: var(--cyan2); background: rgba(0,229,255,0.06); }
+.nav-toggle .ic-close { display: none; }
+.nav-toggle.open .ic-open { display: none; }
+.nav-toggle.open .ic-close { display: inline; }
+
 /* ── Hero ─────────────────────────────────────────────────────── */
 .hero {
   position: relative;
@@ -484,6 +502,81 @@ footer {
 }
 footer a { color: var(--txt2); }
 footer a:hover { color: var(--txt); }
+
+/* ── Responsive ───────────────────────────────────────────────── */
+@media (max-width: 720px) {
+  .nav-toggle { display: inline-flex; }
+  .nav-links {
+    position: absolute;
+    top: 100%;
+    left: 0; right: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    padding: 12px 16px 16px;
+    background: rgba(6, 9, 11, 0.96);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+    transform: translateY(-8px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease, transform 0.18s ease;
+  }
+  .nav-links.open {
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .nav-link, .nav-cta {
+    display: block;
+    text-align: left;
+    padding: 11px 12px;
+    font-size: 0.9em;
+  }
+  .nav-cta { text-align: center; }
+
+  .container { padding: 0 16px; }
+  .nav-inner { padding: 12px 16px; }
+  section { padding: 56px 0; }
+  .hero { padding: 56px 16px 48px; }
+  .hero-badge { font-size: 0.7em; margin-bottom: 22px; padding: 4px 12px; }
+  .hero h1 { margin-bottom: 16px; }
+  .hero-sub { margin-bottom: 30px; }
+  .hero-actions { gap: 10px; }
+  .btn { padding: 11px 20px; font-size: 0.88em; }
+  .hero-stats {
+    gap: 22px 28px;
+    margin-top: 42px;
+    padding-top: 28px;
+  }
+  .stat-val { font-size: 1.4em; }
+
+  .section-head { margin-bottom: 36px; }
+  .formula-box pre { font-size: 0.72em; padding: 16px 14px; line-height: 1.8; }
+  .layer { padding: 16px 16px; gap: 12px; }
+  .layer-num { width: 26px; height: 26px; }
+  .problem-card, .why-card, .sec-box { padding: 22px 18px; }
+  .nano-feat { padding: 18px 16px; }
+  .tool-card { padding: 24px 20px; }
+}
+
+@media (max-width: 420px) {
+  .hero { padding: 44px 14px 40px; }
+  .container { padding: 0 14px; }
+  .nav-inner { padding: 11px 14px; }
+  .hero-badge { font-size: 0.64em; }
+  .hero-stats { gap: 16px 22px; }
+  .stat-val { font-size: 1.25em; }
+  .stat-label { font-size: 0.72em; }
+  .problem-card, .why-card, .sec-box, .nano-feat, .tool-card { padding: 20px 16px; }
+  .formula-box pre { font-size: 0.68em; padding: 14px 12px; }
+}
+
+@media (max-width: 360px) {
+  .hero h1 { font-size: 1.9rem; }
+  .hero-actions { flex-direction: column; }
+  .btn { width: 100%; justify-content: center; }
+}
 </style>
 </head>
 <body>
@@ -494,11 +587,16 @@ footer a:hover { color: var(--txt); }
     <div class="nav-logo">
       <span class="hex">&#x2B21;</span> NanoRandom
     </div>
-    <a class="nav-link" href="#how-it-works">How it works</a>
-    <a class="nav-link" href="#why-blockchain">Why blockchain</a>
-    <a class="nav-link" href="#tools">Tools</a>
-    <a class="nav-link" href="https://github.com/dungvn3000/nanorandom#readme" target="_blank" rel="noopener">GitHub</a>
-    <a class="nav-cta" href="bip39.html">Launch App &#x2192;</a>
+    <div class="nav-links" id="navLinks">
+      <a class="nav-link" href="#how-it-works">How it works</a>
+      <a class="nav-link" href="#why-blockchain">Why blockchain</a>
+      <a class="nav-link" href="#tools">Tools</a>
+      <a class="nav-link" href="https://github.com/dungvn3000/nanorandom#readme" target="_blank" rel="noopener">GitHub</a>
+      <a class="nav-cta" href="bip39.html">Launch App &#x2192;</a>
+    </div>
+    <button class="nav-toggle" id="navToggle" aria-label="Toggle menu" aria-expanded="false">
+      <span class="ic-open">&#9776;</span><span class="ic-close">&#10005;</span>
+    </button>
   </div>
 </nav>
 
@@ -953,6 +1051,27 @@ footer a:hover { color: var(--txt); }
     </p>
   </div>
 </footer>
+
+<script>
+(function () {
+  var toggle = document.getElementById('navToggle');
+  var links = document.getElementById('navLinks');
+  if (!toggle || !links) return;
+  function setOpen(open) {
+    links.classList.toggle('open', open);
+    toggle.classList.toggle('open', open);
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  toggle.addEventListener('click', function () {
+    setOpen(!links.classList.contains('open'));
+  });
+  links.addEventListener('click', function (e) {
+    if (e.target.closest('a')) setOpen(false);
+  });
+  var mq = window.matchMedia('(min-width: 721px)');
+  mq.addEventListener('change', function (e) { if (e.matches) setOpen(false); });
+})();
+</script>
 
 </body>
 </html>
