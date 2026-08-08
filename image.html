@@ -320,7 +320,7 @@ async function entropyToMnemonic(entropyBytes) {
         throw new Error('Entropy contains an invalid byte');
     const checksumLen = entropyBytes.length / 4; // ENT*8/32 bits
     const hashBytes = await sha256(entropyBytes);
-    const bits = toBits(Array.from(entropyBytes)) + toBits(hashBytes).slice(0, checksumLen);
+    const bits = toBits(entropyBytes) + toBits(hashBytes).slice(0, checksumLen);
     const words = [];
     for (let i = 0; i < bits.length; i += 11) {
         const idx = parseInt(bits.slice(i, i + 11), 2);
@@ -382,7 +382,7 @@ async function handleFile(file) {
     try {
         const buf = await file.arrayBuffer();
         imgBytes = new Uint8Array(buf);
-        imgFingerprint = bytesToHex(await sha256(Array.from(imgBytes)));
+        imgFingerprint = bytesToHex(await sha256(imgBytes));
         // Preview thumbnail
         thumb.src = URL.createObjectURL(file);
         fileName.textContent = file.name;
@@ -519,7 +519,7 @@ async function generate() {
         keyMaterial.set(wcByte, imgBytes.length + passBytes.length);
 
         // Salt = SHA-256(image_bytes) — deterministic, file-specific
-        const saltBytes = new Uint8Array(await sha256(Array.from(imgBytes)));
+        const saltBytes = await sha256(imgBytes);
 
         const cryptoKey = await crypto.subtle.importKey(
             'raw', keyMaterial, 'PBKDF2', false, ['deriveBits']
