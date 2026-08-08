@@ -112,6 +112,7 @@ python3 -m http.server 8080   # http://localhost:8080
 ```
 nanorandom/
 ├── index.html    # BIP39 seed phrase generator (markup + CSS + JS + wordlist)
+├── image.html    # image-backed BIP39 seed generator (the image is the backup)
 ├── password.html # independent CSPRNG password generator
 ├── dice.html     # live CSPRNG dice roller (rejection sampling, optional blockhash mixing)
 └── README.md     # this file
@@ -131,6 +132,34 @@ Single-file password generator with two opt-in entropy modes:
 - Selectable charsets: upper / lower / numbers / symbols, length 8–128
 - Guarantees ≥ 1 character from each enabled set on unbiased slots
 - Runs fully offline in CSPRNG mode; fail closed when Web Crypto is unavailable
+
+## Image-backed seed generator (`image.html`)
+
+Single-file BIP39 generator where **an image file is the entropy source — and the
+backup**. Deterministic, offline, zero network calls.
+
+```
+entropy = SHA-256( image_bytes ++ utf8(passphrase) ++ wordCountByte )[0 : ENT/8]
+mnemonic = standard BIP39 with checksum, official 2048-word English list
+```
+
+- **Pick any image** (JPG / PNG / GIF / WEBP / BMP) via click or drag-and-drop; its raw
+  file bytes are hashed
+- **Deterministic & reproducible** — same image + same passphrase + same word count
+  always produce the same seed. That reproducibility is what lets the image act as a
+  backup: re-open the page, choose the same file, type the same passphrase, and the seed
+  is regenerated
+- **Optional passphrase** (strongly recommended) acts as a second factor, like a BIP39
+  passphrase / "25th word" — an attacker who finds your image still cannot recover the
+  seed without it
+- **12 / 15 / 18 / 24 words** (128 / 160 / 192 / 256 bits); checksum verified against the
+  official BIP39 test vectors
+- **SHA-256 fingerprint** of the image is displayed so you can confirm you picked the
+  correct file when restoring
+- **Security model**: the image is the secret — keep it private, offline and
+  unpredictable (not a famous public photo). Keep the **exact bytes** untouched: any
+  re-save / re-encode / crop / metadata-strip changes the bytes and yields a different
+  seed. Losing either the image or the passphrase makes the seed unrecoverable
 
 ## Security notes
 

@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Generate a BIP39 seed phrase from any image file. The image (plus an optional passphrase) is the deterministic entropy source — keep the exact file as your offline backup.">
+<title>NanoRandom — Image-Backed BIP39 Seed Generator</title>
+<style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body { background: #0d1117; color: #e6edf3; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; max-width: 720px; margin: 0 auto; padding: 2em 1em; }
+    h1 { font-size: 1.2rem; font-weight: 600; }
+    h1 small { color: #8b949e; font-size: .75em; font-weight: normal; }
+    .row { display: flex; gap: .6em; align-items: center; flex-wrap: wrap; margin: 1em 0 1.2em; }
+    select, button { background: #161b22; color: #e6edf3; border: 1px solid #30363d; border-radius: 6px; padding: .5em .8em; font: inherit; cursor: pointer; }
+    button { background: #1f6feb; border-color: #1f6feb; }
+    button:hover { filter: brightness(1.15); }
+    button:disabled { opacity: .5; cursor: default; filter: none; }
+    .eyebtn { background: #161b22; color: #8b949e; border: 1px solid #30363d; }
+    .eyebtn:hover { filter: brightness(1.2); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: .5em; margin-top: 1em; }
+    .word { background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: .5em .7em; }
+    .word b { color: #8b949e; margin-right: .5em; font-weight: normal; }
+    .ent { color: #8b949e; word-break: break-all; margin-top: 1em; font-size: .85em; }
+    .note { color: #8b949e; font-size: .85em; margin-top: 1.4em; line-height: 1.6; }
+    .note a { color: #58a6ff; }
+    .err { color: #f85149; min-height: 1.2em; }
+    .ok { color: #3fb950; min-height: 1.2em; }
+    .dim { color: #586069; font-size: .9em; }
+    .warn { color: #d29922; }
+    .saltinput { flex: 1; min-width: 180px; background: #161b22; color: #e6edf3; border: 1px solid #30363d; border-radius: 6px; padding: .5em .8em; font: inherit; }
+    .mix { font-size: .85em; color: #8b949e; display: flex; gap: .4em; align-items: center; cursor: pointer; }
+    .mix input { accent-color: #1f6feb; }
+
+    /* Drop zone + preview */
+    .drop {
+        position: relative;
+        border: 2px dashed #30363d;
+        border-radius: 8px;
+        padding: 1.4em 1em;
+        text-align: center;
+        color: #8b949e;
+        cursor: pointer;
+        transition: border-color .2s, background .2s;
+        margin: 1em 0 .6em;
+    }
+    .drop:hover { border-color: #1f6feb; background: #161b2280; }
+    .drop.drag { border-color: #1f6feb; background: #1f6feb22; }
+    .drop .ico { font-size: 2em; display:block; margin-bottom:.3em; }
+    .drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+    .preview { display: flex; gap: 1em; align-items: flex-start; margin: .8em 0; flex-wrap: wrap; }
+    .preview img {
+        width: 120px; height: 120px; object-fit: cover;
+        border: 1px solid #30363d; border-radius: 6px; background: #161b22;
+    }
+    .preview .meta { font-size: .82em; color: #8b949e; line-height: 1.7; word-break: break-all; }
+    .preview .meta b { color: #c9d1d9; font-weight: normal; }
+    .fp { font-family: ui-monospace, monospace; color: #58a6ff; }
+    .strengthbar { background: #161b22; border: 1px solid #30363d; border-radius: 4px; height: 7px; overflow: hidden; margin-top: .4em; max-width: 320px; }
+    .strengthbar > div { height: 100%; transition: width .25s, background .25s; width: 0%; }
+    @keyframes wordFlash { 0%{background:#1f6feb33;border-color:#1f6feb} 100%{background:#161b22;border-color:#30363d} }
+    .word.flash { animation: wordFlash 0.6s ease-out; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner { display: inline-block; width: .9em; height: .9em; border: 2px solid #30363d;
+        border-top-color: #1f6feb; border-radius: 50%; animation: spin .7s linear infinite;
+        vertical-align: middle; margin-right: .4em; }
+</style>
+</head>
+<body>
+    <h1>Image-Backed BIP39 Seed Generator <small>&mdash; the image is your backup</small></h1>
+
+    <div class="drop" id="drop">
+        <span class="ico">&#x1F5BC;&#xFE0F;</span>
+        <span><b>Click to choose an image</b> or drag &amp; drop it here<br>
+        <span class="dim">JPG, PNG, GIF, WEBP, BMP &mdash; any image works. The exact file bytes become your entropy.</span></span>
+        <input type="file" id="file" accept="image/*">
+    </div>
+
+    <div class="preview" id="preview" style="display:none">
+        <img id="thumb" alt="selected image preview">
+        <div class="meta">
+            <div><b>File:</b> <span id="fileName">&mdash;</span></div>
+            <div><b>Size:</b> <span id="fileSize">&mdash;</span></div>
+            <div><b>Type:</b> <span id="fileType">&mdash;</span></div>
+            <div><b>SHA-256:</b> <span class="fp" id="imgFp">&mdash;</span></div>
+            <div class="warn" id="imgWarn" style="display:none"></div>
+        </div>
+    </div>
+
+    <div class="row">
+        <select id="wc" aria-label="Word count">
+            <option value="12" selected>12 words</option>
+            <option value="15">15 words</option>
+            <option value="18">18 words</option>
+            <option value="24">24 words</option>
+        </select>
+        <button id="copyBtn" class="eyebtn" type="button" disabled>Copy</button>
+    </div>
+
+    <div class="row">
+        <label class="dim" for="pass">Passphrase</label>
+        <input class="saltinput" id="pass" type="password" placeholder="optional 2nd factor — strongly recommended"
+               autocomplete="new-password" autocapitalize="none" autocorrect="off" spellcheck="false">
+        <button id="passEye" class="eyebtn" type="button" title="Show passphrase">Show</button>
+    </div>
+    <div class="strengthbar"><div id="strengthBar"></div></div>
+    <div class="dim" id="passHint" style="font-size:.82em;margin-top:.3em;min-height:1.2em;"></div>
+
+    <p class="ok" id="ok" role="status"></p>
+    <p class="err" id="err" role="alert"></p>
+
+    <div class="grid" id="grid"></div>
+    <div class="ent">Entropy: <span id="ent">&mdash;</span></div>
+    <div class="ent" id="srcInfo"></div>
+
+    <p class="note">
+        <b>How it works.</b> Your image is read as raw bytes and fed into
+        <b>PBKDF2-HMAC-SHA-256</b> (200 000 iterations) with the following inputs:<br>
+        &bull; <b>key material</b> — <code>image_bytes ++ utf8(passphrase) ++ word_count_byte</code><br>
+        &bull; <b>salt</b> — SHA-256 of the image bytes (ties the KDF to this exact file)<br>
+        The derived bits are truncated to the BIP39 entropy length (128&ndash;256 bits), a
+        standard BIP39 checksum is appended, and the result is mapped to words from the
+        official 2048-word English list.
+        The high iteration count makes brute-forcing the image or passphrase ~200 000&times;
+        harder than a plain SHA-256 hash.
+        <b>Deterministic:</b> the same image + same passphrase + same word count always
+        produce the same seed. That is exactly what makes the image a usable <i>backup</i> &mdash;
+        re-open this page, pick the same file, type the same passphrase, and the seed is
+        regenerated.
+    </p>
+    <p class="note">
+        <b>The image is the secret.</b> Anyone who obtains your exact image file (and your
+        passphrase, if you set one) can reproduce this seed. Keep the file private, offline,
+        and ideally unpredictable &mdash; not a famous public photo someone could try.
+        <b>Keep the exact bytes.</b> Re-saving, re-encoding, compressing, cropping or even
+        stripping metadata changes the bytes and produces a <i>different</i> seed. Store the
+        original file untouched. The SHA-256 fingerprint above lets you verify you picked
+        the right file when restoring.
+    </p>
+    <p class="note">
+        <b>Use a passphrase.</b> With a strong passphrase, an attacker who finds your image
+        still cannot recover the seed without it. Treat it like a BIP39 passphrase
+        (&ldquo;25th word&rdquo;): memorise it, do not store it next to the image. Losing
+        either the image or the passphrase means the seed is unrecoverable.
+    </p>
+    <p class="note">
+        <b>Need a one-time random seed instead?</b> Use the
+        <a href="bip39.html">standard BIP39 generator</a> &mdash; it draws fresh CSPRNG
+        entropy each time and is <i>not</i> reproducible. This image tool is for
+        reproducible, image-backed seeds.
+        <br><br>
+        <a href="index.html">&larr; Home</a>
+        &nbsp;&middot;&nbsp;
+        <a href="bip39.html">Standard BIP39 generator</a>
+        &nbsp;&middot;&nbsp;
+        <a href="camera.html">Camera entropy</a>
+        &nbsp;&middot;&nbsp;
+        <a href="password.html">Password generator</a>
+        &nbsp;&middot;&nbsp;
+        <a href="dice.html">Dice roller</a>
+        &nbsp;&middot;&nbsp;
+        <a href="matrix.html">Matrix rain</a>
+    </p>
+
+<script>
+"use strict";
+
+// Official BIP39 English wordlist (2048 words).
+const WORDLIST = [
+"abandon","ability","able","about","above","absent","absorb","abstract","absurd","abuse","access","accident","account","accuse","achieve","acid",
+"acoustic","acquire","across","act","action","actor","actress","actual","adapt","add","addict","address","adjust","admit","adult","advance",
+"advice","aerobic","affair","afford","afraid","again","age","agent","agree","ahead","aim","air","airport","aisle","alarm","album",
+"alcohol","alert","alien","all","alley","allow","almost","alone","alpha","already","also","alter","always","amateur","amazing","among",
+"amount","amused","analyst","anchor","ancient","anger","angle","angry","animal","ankle","announce","annual","another","answer","antenna","antique",
+"anxiety","any","apart","apology","appear","apple","approve","april","arch","arctic","area","arena","argue","arm","armed","armor",
+"army","around","arrange","arrest","arrive","arrow","art","artefact","artist","artwork","ask","aspect","assault","asset","assist","assume",
+"asthma","athlete","atom","attack","attend","attitude","attract","auction","audit","august","aunt","author","auto","autumn","average","avocado",
+"avoid","awake","aware","away","awesome","awful","awkward","axis","baby","bachelor","bacon","badge","bag","balance","balcony","ball",
+"bamboo","banana","banner","bar","barely","bargain","barrel","base","basic","basket","battle","beach","bean","beauty","because","become",
+"beef","before","begin","behave","behind","believe","below","belt","bench","benefit","best","betray","better","between","beyond","bicycle",
+"bid","bike","bind","biology","bird","birth","bitter","black","blade","blame","blanket","blast","bleak","bless","blind","blood",
+"blossom","blouse","blue","blur","blush","board","boat","body","boil","bomb","bone","bonus","book","boost","border","boring",
+"borrow","boss","bottom","bounce","box","boy","bracket","brain","brand","brass","brave","bread","breeze","brick","bridge","brief",
+"bright","bring","brisk","broccoli","broken","bronze","broom","brother","brown","brush","bubble","buddy","budget","buffalo","build","bulb",
+"bulk","bullet","bundle","bunker","burden","burger","burst","bus","business","busy","butter","buyer","buzz","cabbage","cabin","cable",
+"cactus","cage","cake","call","calm","camera","camp","can","canal","cancel","candy","cannon","canoe","canvas","canyon","capable",
+"capital","captain","car","carbon","card","cargo","carpet","carry","cart","case","cash","casino","castle","casual","cat","catalog",
+"catch","category","cattle","caught","cause","caution","cave","ceiling","celery","cement","census","century","cereal","certain","chair","chalk",
+"champion","change","chaos","chapter","charge","chase","chat","cheap","check","cheese","chef","cherry","chest","chicken","chief","child",
+"chimney","choice","choose","chronic","chuckle","chunk","churn","cigar","cinnamon","circle","citizen","city","civil","claim","clap","clarify",
+"claw","clay","clean","clerk","clever","click","client","cliff","climb","clinic","clip","clock","clog","close","cloth","cloud",
+"clown","club","clump","cluster","clutch","coach","coast","coconut","code","coffee","coil","coin","collect","color","column","combine",
+"come","comfort","comic","common","company","concert","conduct","confirm","congress","connect","consider","control","convince","cook","cool","copper",
+"copy","coral","core","corn","correct","cost","cotton","couch","country","couple","course","cousin","cover","coyote","crack","cradle",
+"craft","cram","crane","crash","crater","crawl","crazy","cream","credit","creek","crew","cricket","crime","crisp","critic","crop",
+"cross","crouch","crowd","crucial","cruel","cruise","crumble","crunch","crush","cry","crystal","cube","culture","cup","cupboard","curious",
+"current","curtain","curve","cushion","custom","cute","cycle","dad","damage","damp","dance","danger","daring","dash","daughter","dawn",
+"day","deal","debate","debris","decade","december","decide","decline","decorate","decrease","deer","defense","define","defy","degree","delay",
+"deliver","demand","demise","denial","dentist","deny","depart","depend","deposit","depth","deputy","derive","describe","desert","design","desk",
+"despair","destroy","detail","detect","develop","device","devote","diagram","dial","diamond","diary","dice","diesel","diet","differ","digital",
+"dignity","dilemma","dinner","dinosaur","direct","dirt","disagree","discover","disease","dish","dismiss","disorder","display","distance","divert","divide",
+"divorce","dizzy","doctor","document","dog","doll","dolphin","domain","donate","donkey","donor","door","dose","double","dove","draft",
+"dragon","drama","drastic","draw","dream","dress","drift","drill","drink","drip","drive","drop","drum","dry","duck","dumb",
+"dune","during","dust","dutch","duty","dwarf","dynamic","eager","eagle","early","earn","earth","easily","east","easy","echo",
+"ecology","economy","edge","edit","educate","effort","egg","eight","either","elbow","elder","electric","elegant","element","elephant","elevator",
+"elite","else","embark","embody","embrace","emerge","emotion","employ","empower","empty","enable","enact","end","endless","endorse","enemy",
+"energy","enforce","engage","engine","enhance","enjoy","enlist","enough","enrich","enroll","ensure","enter","entire","entry","envelope","episode",
+"equal","equip","era","erase","erode","erosion","error","erupt","escape","essay","essence","estate","eternal","ethics","evidence","evil",
+"evoke","evolve","exact","example","excess","exchange","excite","exclude","excuse","execute","exercise","exhaust","exhibit","exile","exist","exit",
+"exotic","expand","expect","expire","explain","expose","express","extend","extra","eye","eyebrow","fabric","face","faculty","fade","faint",
+"faith","fall","false","fame","family","famous","fan","fancy","fantasy","farm","fashion","fat","fatal","father","fatigue","fault",
+"favorite","feature","february","federal","fee","feed","feel","female","fence","festival","fetch","fever","few","fiber","fiction","field",
+"figure","file","film","filter","final","find","fine","finger","finish","fire","firm","first","fiscal","fish","fit","fitness",
+"fix","flag","flame","flash","flat","flavor","flee","flight","flip","float","flock","floor","flower","fluid","flush","fly",
+"foam","focus","fog","foil","fold","follow","food","foot","force","forest","forget","fork","fortune","forum","forward","fossil",
+"foster","found","fox","fragile","frame","frequent","fresh","friend","fringe","frog","front","frost","frown","frozen","fruit","fuel",
+"fun","funny","furnace","fury","future","gadget","gain","galaxy","gallery","game","gap","garage","garbage","garden","garlic","garment",
+"gas","gasp","gate","gather","gauge","gaze","general","genius","genre","gentle","genuine","gesture","ghost","giant","gift","giggle",
+"ginger","giraffe","girl","give","glad","glance","glare","glass","glide","glimpse","globe","gloom","glory","glove","glow","glue",
+"goat","goddess","gold","good","goose","gorilla","gospel","gossip","govern","gown","grab","grace","grain","grant","grape","grass",
+"gravity","great","green","grid","grief","grit","grocery","group","grow","grunt","guard","guess","guide","guilt","guitar","gun",
+"gym","habit","hair","half","hammer","hamster","hand","happy","harbor","hard","harsh","harvest","hat","have","hawk","hazard",
+"head","health","heart","heavy","hedgehog","height","hello","helmet","help","hen","hero","hidden","high","hill","hint","hip",
+"hire","history","hobby","hockey","hold","hole","holiday","hollow","home","honey","hood","hope","horn","horror","horse","hospital",
+"host","hotel","hour","hover","hub","huge","human","humble","humor","hundred","hungry","hunt","hurdle","hurry","hurt","husband",
+"hybrid","ice","icon","idea","identify","idle","ignore","ill","illegal","illness","image","imitate","immense","immune","impact","impose",
+"improve","impulse","inch","include","income","increase","index","indicate","indoor","industry","infant","inflict","inform","inhale","inherit","initial",
+"inject","injury","inmate","inner","innocent","input","inquiry","insane","insect","inside","inspire","install","intact","interest","into","invest",
+"invite","involve","iron","island","isolate","issue","item","ivory","jacket","jaguar","jar","jazz","jealous","jeans","jelly","jewel",
+"job","join","joke","journey","joy","judge","juice","jump","jungle","junior","junk","just","kangaroo","keen","keep","ketchup",
+"key","kick","kid","kidney","kind","kingdom","kiss","kit","kitchen","kite","kitten","kiwi","knee","knife","knock","know",
+"lab","label","labor","ladder","lady","lake","lamp","language","laptop","large","later","latin","laugh","laundry","lava","law",
+"lawn","lawsuit","layer","lazy","leader","leaf","learn","leave","lecture","left","leg","legal","legend","leisure","lemon","lend",
+"length","lens","leopard","lesson","letter","level","liar","liberty","library","license","life","lift","light","like","limb","limit",
+"link","lion","liquid","list","little","live","lizard","load","loan","lobster","local","lock","logic","lonely","long","loop",
+"lottery","loud","lounge","love","loyal","lucky","luggage","lumber","lunar","lunch","luxury","lyrics","machine","mad","magic","magnet",
+"maid","mail","main","major","make","mammal","man","manage","mandate","mango","mansion","manual","maple","marble","march","margin",
+"marine","market","marriage","mask","mass","master","match","material","math","matrix","matter","maximum","maze","meadow","mean","measure",
+"meat","mechanic","medal","media","melody","melt","member","memory","mention","menu","mercy","merge","merit","merry","mesh","message",
+"metal","method","middle","midnight","milk","million","mimic","mind","minimum","minor","minute","miracle","mirror","misery","miss","mistake",
+"mix","mixed","mixture","mobile","model","modify","mom","moment","monitor","monkey","monster","month","moon","moral","more","morning",
+"mosquito","mother","motion","motor","mountain","mouse","move","movie","much","muffin","mule","multiply","muscle","museum","mushroom","music",
+"must","mutual","myself","mystery","myth","naive","name","napkin","narrow","nasty","nation","nature","near","neck","need","negative",
+"neglect","neither","nephew","nerve","nest","net","network","neutral","never","news","next","nice","night","noble","noise","nominee",
+"noodle","normal","north","nose","notable","note","nothing","notice","novel","now","nuclear","number","nurse","nut","oak","obey",
+"object","oblige","obscure","observe","obtain","obvious","occur","ocean","october","odor","off","offer","office","often","oil","okay",
+"old","olive","olympic","omit","once","one","onion","online","only","open","opera","opinion","oppose","option","orange","orbit",
+"orchard","order","ordinary","organ","orient","original","orphan","ostrich","other","outdoor","outer","output","outside","oval","oven","over",
+"own","owner","oxygen","oyster","ozone","pact","paddle","page","pair","palace","palm","panda","panel","panic","panther","paper",
+"parade","parent","park","parrot","party","pass","patch","path","patient","patrol","pattern","pause","pave","payment","peace","peanut",
+"pear","peasant","pelican","pen","penalty","pencil","people","pepper","perfect","permit","person","pet","phone","photo","phrase","physical",
+"piano","picnic","picture","piece","pig","pigeon","pill","pilot","pink","pioneer","pipe","pistol","pitch","pizza","place","planet",
+"plastic","plate","play","please","pledge","pluck","plug","plunge","poem","poet","point","polar","pole","police","pond","pony",
+"pool","popular","portion","position","possible","post","potato","pottery","poverty","powder","power","practice","praise","predict","prefer","prepare",
+"present","pretty","prevent","price","pride","primary","print","priority","prison","private","prize","problem","process","produce","profit","program",
+"project","promote","proof","property","prosper","protect","proud","provide","public","pudding","pull","pulp","pulse","pumpkin","punch","pupil",
+"puppy","purchase","purity","purpose","purse","push","put","puzzle","pyramid","quality","quantum","quarter","question","quick","quit","quiz",
+"quote","rabbit","raccoon","race","rack","radar","radio","rail","rain","raise","rally","ramp","ranch","random","range","rapid",
+"rare","rate","rather","raven","raw","razor","ready","real","reason","rebel","rebuild","recall","receive","recipe","record","recycle",
+"reduce","reflect","reform","refuse","region","regret","regular","reject","relax","release","relief","rely","remain","remember","remind","remove",
+"render","renew","rent","reopen","repair","repeat","replace","report","require","rescue","resemble","resist","resource","response","result","retire",
+"retreat","return","reunion","reveal","review","reward","rhythm","rib","ribbon","rice","rich","ride","ridge","rifle","right","rigid",
+"ring","riot","ripple","risk","ritual","rival","river","road","roast","robot","robust","rocket","romance","roof","rookie","room",
+"rose","rotate","rough","round","route","royal","rubber","rude","rug","rule","run","runway","rural","sad","saddle","sadness",
+"safe","sail","salad","salmon","salon","salt","salute","same","sample","sand","satisfy","satoshi","sauce","sausage","save","say",
+"scale","scan","scare","scatter","scene","scheme","school","science","scissors","scorpion","scout","scrap","screen","script","scrub","sea",
+"search","season","seat","second","secret","section","security","seed","seek","segment","select","sell","seminar","senior","sense","sentence",
+"series","service","session","settle","setup","seven","shadow","shaft","shallow","share","shed","shell","sheriff","shield","shift","shine",
+"ship","shiver","shock","shoe","shoot","shop","short","shoulder","shove","shrimp","shrug","shuffle","shy","sibling","sick","side",
+"siege","sight","sign","silent","silk","silly","silver","similar","simple","since","sing","siren","sister","situate","six","size",
+"skate","sketch","ski","skill","skin","skirt","skull","slab","slam","sleep","slender","slice","slide","slight","slim","slogan",
+"slot","slow","slush","small","smart","smile","smoke","smooth","snack","snake","snap","sniff","snow","soap","soccer","social",
+"sock","soda","soft","solar","soldier","solid","solution","solve","someone","song","soon","sorry","sort","soul","sound","soup",
+"source","south","space","spare","spatial","spawn","speak","special","speed","spell","spend","sphere","spice","spider","spike","spin",
+"spirit","split","spoil","sponsor","spoon","sport","spot","spray","spread","spring","spy","square","squeeze","squirrel","stable","stadium",
+"staff","stage","stairs","stamp","stand","start","state","stay","steak","steel","stem","step","stereo","stick","still","sting",
+"stock","stomach","stone","stool","story","stove","strategy","street","strike","strong","struggle","student","stuff","stumble","style","subject",
+"submit","subway","success","such","sudden","suffer","sugar","suggest","suit","summer","sun","sunny","sunset","super","supply","supreme",
+"sure","surface","surge","surprise","surround","survey","suspect","sustain","swallow","swamp","swap","swarm","swear","sweet","swift","swim",
+"swing","switch","sword","symbol","symptom","syrup","system","table","tackle","tag","tail","talent","talk","tank","tape","target",
+"task","taste","tattoo","taxi","teach","team","tell","ten","tenant","tennis","tent","term","test","text","thank","that",
+"theme","then","theory","there","they","thing","this","thought","three","thrive","throw","thumb","thunder","ticket","tide","tiger",
+"tilt","timber","time","tiny","tip","tired","tissue","title","toast","tobacco","today","toddler","toe","together","toilet","token",
+"tomato","tomorrow","tone","tongue","tonight","tool","tooth","top","topic","topple","torch","tornado","tortoise","toss","total","tourist",
+"toward","tower","town","toy","track","trade","traffic","tragic","train","transfer","trap","trash","travel","tray","treat","tree",
+"trend","trial","tribe","trick","trigger","trim","trip","trophy","trouble","truck","true","truly","trumpet","trust","truth","try",
+"tube","tuition","tumble","tuna","tunnel","turkey","turn","turtle","twelve","twenty","twice","twin","twist","two","type","typical",
+"ugly","umbrella","unable","unaware","uncle","uncover","under","undo","unfair","unfold","unhappy","uniform","unique","unit","universe","unknown",
+"unlock","until","unusual","unveil","update","upgrade","uphold","upon","upper","upset","urban","urge","usage","use","used","useful",
+"useless","usual","utility","vacant","vacuum","vague","valid","valley","valve","van","vanish","vapor","various","vast","vault","vehicle",
+"velvet","vendor","venture","venue","verb","verify","version","very","vessel","veteran","viable","vibrant","vicious","victory","video","view",
+"village","vintage","violin","virtual","virus","visa","visit","visual","vital","vivid","vocal","voice","void","volcano","volume","vote",
+"voyage","wage","wagon","wait","walk","wall","walnut","want","warfare","warm","warrior","wash","wasp","waste","water","wave",
+"way","wealth","weapon","wear","weasel","weather","web","wedding","weekend","weird","welcome","west","wet","whale","what","wheat",
+"wheel","when","where","whip","whisper","wide","width","wife","wild","will","win","window","wine","wing","wink","winner",
+"winter","wire","wisdom","wise","wish","witness","wolf","woman","wonder","wood","wool","word","work","world","worry","worth",
+"wrap","wreck","wrestle","wrist","write","wrong","yard","year","yellow","you","young","youth","zebra","zero","zone","zoo"
+];
+
+// ─── Crypto helpers ───────────────────────────────────────────────────────────
+async function sha256(bytes) {
+    const view = bytes instanceof Uint8Array
+        ? bytes
+        : new Uint8Array(bytes);
+
+    const hash = await crypto.subtle.digest("SHA-256", view);
+    return new Uint8Array(hash);
+}
+function toBits(bytes) {
+    return bytes.map(b => b.toString(2).padStart(8, '0')).join('');
+}
+function bytesToHex(bytes) {
+    return bytes.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+async function entropyToMnemonic(entropyBytes) {
+    if (WORDLIST.length !== 2048) throw new Error('Invalid BIP39 wordlist');
+    const allowed = new Set([16, 20, 24, 28, 32]);
+    if (!allowed.has(entropyBytes.length)) throw new Error('Invalid BIP39 entropy length');
+    for (const b of entropyBytes) if (!Number.isInteger(b) || b < 0 || b > 255)
+        throw new Error('Entropy contains an invalid byte');
+    const checksumLen = entropyBytes.length / 4; // ENT*8/32 bits
+    const hashBytes = await sha256(entropyBytes);
+    const bits = toBits(Array.from(entropyBytes)) + toBits(hashBytes).slice(0, checksumLen);
+    const words = [];
+    for (let i = 0; i < bits.length; i += 11) {
+        const idx = parseInt(bits.slice(i, i + 11), 2);
+        const w = WORDLIST[idx];
+        if (typeof w !== 'string') throw new Error('Wordlist index out of range');
+        words.push(w);
+    }
+    return words;
+}
+
+// ─── DOM ──────────────────────────────────────────────────────────────────────
+const drop      = document.getElementById('drop');
+const fileInput = document.getElementById('file');
+const preview   = document.getElementById('preview');
+const thumb     = document.getElementById('thumb');
+const fileName  = document.getElementById('fileName');
+const fileSize  = document.getElementById('fileSize');
+const fileType  = document.getElementById('fileType');
+const imgFp     = document.getElementById('imgFp');
+const imgWarn   = document.getElementById('imgWarn');
+const wcEl      = document.getElementById('wc');
+const copyBtn   = document.getElementById('copyBtn');
+const passEl    = document.getElementById('pass');
+const passEye   = document.getElementById('passEye');
+const passHint  = document.getElementById('passHint');
+const strengthBar = document.getElementById('strengthBar');
+const grid       = document.getElementById('grid');
+const entEl      = document.getElementById('ent');
+const srcInfo    = document.getElementById('srcInfo');
+const errEl      = document.getElementById('err');
+const okEl       = document.getElementById('ok');
+
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB — images larger than this are rejected
+
+let imgBytes = null; // Uint8Array of the selected file's raw bytes
+let imgFingerprint = '';
+let lastWords = [];
+let hasGenerated = false;   // becomes true after the first successful Generate
+let passDebounce = null;
+
+function fmtSize(n) {
+    if (n < 1024) return n + ' B';
+    if (n < 1024*1024) return (n/1024).toFixed(1) + ' KB';
+    return (n/1024/1024).toFixed(2) + ' MB';
+}
+
+async function handleFile(file) {
+    errEl.textContent = '';
+    okEl.textContent = '';
+    if (!file) return;
+    if (!/^image\//.test(file.type) && !/\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(file.name)) {
+        errEl.textContent = 'Please choose an image file.';
+        return;
+    }
+    if (file.size > MAX_FILE_SIZE) {
+        errEl.textContent = 'File too large (' + fmtSize(file.size) + '). Maximum allowed size is ' + fmtSize(MAX_FILE_SIZE) + '.';
+        return;
+    }
+    try {
+        const buf = await file.arrayBuffer();
+        imgBytes = new Uint8Array(buf);
+        imgFingerprint = bytesToHex(await sha256(Array.from(imgBytes)));
+        // Preview thumbnail
+        thumb.src = URL.createObjectURL(file);
+        fileName.textContent = file.name;
+        fileSize.textContent = fmtSize(file.size);
+        fileType.textContent = file.type || 'unknown';
+        imgFp.textContent = imgFingerprint.slice(0, 32) + '…' + imgFingerprint.slice(-12);
+        preview.style.display = '';
+        // Warnings
+        imgWarn.style.display = 'none';
+        if (file.size < 1024) {
+            imgWarn.style.display = '';
+            imgWarn.textContent = 'Small image (' + fmtSize(file.size) + ') — fine as long as its bytes are unpredictable to others.';
+        }
+        resetOutput();
+        generate(); // auto-derive on image pick — no button needed
+    } catch (e) {
+        errEl.textContent = 'Could not read image: ' + e.message;
+        imgBytes = null;
+    }
+}
+
+fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
+
+// Drag & drop
+['dragenter','dragover'].forEach(ev =>
+    drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('drag'); }));
+['dragleave','drop'].forEach(ev =>
+    drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('drag'); }));
+drop.addEventListener('drop', e => {
+    const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) handleFile(f);
+});
+// Clicking the drop area opens the file dialog (the transparent <input> covers it,
+// but keep this for explicit accessibility)
+drop.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') fileInput.click(); });
+
+// Passphrase eye toggle + hint
+passEye.addEventListener('click', () => {
+    const show = passEl.type === 'password';
+    passEl.type = show ? 'text' : 'password';
+    passEye.textContent = show ? 'Hide' : 'Show';
+    passEye.title = (show ? 'Hide' : 'Show') + ' passphrase';
+});
+
+function passphraseBits(s) {
+    // Estimate entropy based on the actual character pool used in the passphrase.
+    // For each character class present we add its pool size, then multiply
+    // log2(pool) × length — a standard password-strength heuristic.
+    if (!s) return 0;
+    let pool = 0;
+    if (/[a-z]/.test(s))        pool += 26; // a–z
+    if (/[A-Z]/.test(s))        pool += 26; // A–Z
+    if (/[0-9]/.test(s))        pool += 10; // 0–9
+    if (/[ !-/:-@[-`{-~]/.test(s)) pool += 33; // printable ASCII symbols + space
+    if (/[^\x00-\x7F]/.test(s)) pool += 64; // non-ASCII (emoji, accented, …)
+    const bitsPerChar = pool > 1 ? Math.log2(pool) : 1;
+    return Math.min(256, Math.round(s.length * bitsPerChar));
+}
+function updatePassHint() {
+    const s = passEl.value;
+    const bits = passphraseBits(s);
+    let label, color, pct;
+    if (!s) { label = 'No passphrase — the image alone is the secret.'; color = '#d29922'; pct = 8; }
+    else if (bits < 40) { label = 'Weak passphrase (' + bits + ' bits) — longer is better.'; color = '#f85149'; pct = 25; }
+    else if (bits < 80) { label = 'Fair passphrase (~' + bits + ' bits).'; color = '#d29922'; pct = 55; }
+    else { label = 'Strong passphrase (~' + bits + ' bits).'; color = '#3fb950'; pct = 100; }
+    passHint.textContent = label;
+    passHint.style.color = color;
+    strengthBar.firstElementChild && (strengthBar.firstElementChild.style.cssText = '');
+    const fill = strengthBar.firstElementChild || (() => {
+        const d = document.createElement('div'); strengthBar.appendChild(d); return d;
+    })();
+    fill.style.width = pct + '%';
+    fill.style.background = color;
+}
+passEl.addEventListener('input', () => {
+    updatePassHint();
+    // Auto re-derive the seed as the passphrase changes — the passphrase is an
+    // input of the deterministic derivation, so the seed must follow it.
+    if (hasGenerated && imgBytes) {
+        clearTimeout(passDebounce);
+        passDebounce = setTimeout(generate, 220);
+    }
+});
+updatePassHint();
+
+// Word count is also a derivation input — regenerate on change.
+wcEl.addEventListener('change', () => {
+    if (hasGenerated && imgBytes) generate();
+});
+
+function resetOutput() {
+    grid.textContent = '';
+    entEl.textContent = '—';
+    srcInfo.textContent = '';
+    copyBtn.disabled = true;
+    lastWords = [];
+    okEl.textContent = '';
+}
+
+async function generate() {
+    errEl.textContent = '';
+    okEl.textContent = '';
+    srcInfo.textContent = '';
+    if (!imgBytes) { errEl.textContent = 'Choose an image first.'; return; }
+    if (typeof crypto === 'undefined' || !crypto.subtle) {
+        errEl.textContent = 'Web Crypto unavailable — cannot derive seed.'; return;
+    }
+    const byteLen = { 12: 16, 15: 20, 18: 24, 24: 32 }[wcEl.value];
+    if (!byteLen) { errEl.textContent = 'Unsupported word count.'; return; }
+
+    // Show spinner while PBKDF2 runs (~200k iterations ≈ 0.5–1 s)
+    okEl.innerHTML = '<span class="spinner"></span>Deriving seed…';
+    copyBtn.disabled = true;
+    // Yield to browser so spinner renders before blocking KDF work
+    await new Promise(r => setTimeout(r, 0));
+
+    try {
+        // Deterministic derivation via PBKDF2-HMAC-SHA-256:
+        //   key material = image_bytes ++ utf8(passphrase) ++ word_count_byte
+        //   salt         = SHA-256(image_bytes)   — ties KDF to this exact file
+        //   iterations   = 200 000                — NIST SP 800-132 minimum for SHA-256
+        //   output       = byteLen bytes of entropy
+        const enc = new TextEncoder();
+        const passBytes = passEl.value ? enc.encode(passEl.value) : new Uint8Array(0);
+        const wcByte = new Uint8Array([Number(wcEl.value) & 0xff]);
+
+        // Concatenate: image ++ passphrase ++ word_count_byte
+        const keyMaterial = new Uint8Array(
+            imgBytes.length + passBytes.length + 1
+        );
+        keyMaterial.set(imgBytes, 0);
+        keyMaterial.set(passBytes, imgBytes.length);
+        keyMaterial.set(wcByte, imgBytes.length + passBytes.length);
+
+        // Salt = SHA-256(image_bytes) — deterministic, file-specific
+        const saltBytes = new Uint8Array(await sha256(Array.from(imgBytes)));
+
+        const cryptoKey = await crypto.subtle.importKey(
+            'raw', keyMaterial, 'PBKDF2', false, ['deriveBits']
+        );
+        const derived = await crypto.subtle.deriveBits(
+            { name: 'PBKDF2', salt: saltBytes, iterations: 200_000, hash: 'SHA-256' },
+            cryptoKey,
+            byteLen * 8
+        );
+        const entropyBytes = Array.from(new Uint8Array(derived));
+
+        const words = await entropyToMnemonic(entropyBytes);
+        if (words.length !== Number(wcEl.value)) throw new Error('Unexpected mnemonic length');
+        for (const w of words) if (!WORDLIST.includes(w)) throw new Error('Invalid word: ' + w);
+
+        grid.textContent = '';
+        lastWords = words;
+        words.forEach((w, i) => {
+            const cell = document.createElement('div');
+            cell.className = 'word flash';
+            const num = document.createElement('b');
+            num.textContent = (i + 1) + '.';
+            const span = document.createElement('span');
+            span.textContent = w;
+            cell.append(num, span);
+            grid.append(cell);
+        });
+        entEl.textContent = bytesToHex(entropyBytes);
+        const fpShort = imgFingerprint.slice(0, 16) + '…' + imgFingerprint.slice(-8);
+        srcInfo.textContent = 'PBKDF2(200k) · image ' + imgBytes.length + ' B (SHA-256 ' + fpShort + ')'
+            + (passEl.value ? ' + passphrase (' + passEl.value.length + ' chars)' : ' (no passphrase)')
+            + ' · ' + wcEl.value + ' words';
+        copyBtn.disabled = false;
+        okEl.textContent = 'Seed derived deterministically — keep this exact image file as your backup.';
+        hasGenerated = true;
+    } catch (e) {
+        resetOutput();
+        errEl.textContent = e.message || 'Generation failed';
+    }
+}
+
+let copyReset = null;
+copyBtn.addEventListener('click', async () => {
+    if (!lastWords.length) return;
+    try {
+        await navigator.clipboard.writeText(lastWords.join(' '));
+        copyBtn.textContent = 'Copied!';
+        clearTimeout(copyReset);
+        copyReset = setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1500);
+    } catch (e) {
+        errEl.textContent = 'Cannot copy: ' + e.message;
+    }
+});
+</script>
+
+<footer style="border-top:1px solid rgba(255,255,255,0.08);padding:32px 24px;text-align:center;font-size:0.78em;color:#6b8f7a;margin-top:40px;">
+  <p style="margin:0;line-height:1.6;">
+    This tool is provided as-is, educational &amp; experimental — no warranty.<br>
+    Generated phrases are for testing and learning. Use at your own risk.
+  </p>
+</footer>
+</body>
+</html>
